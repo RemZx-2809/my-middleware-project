@@ -1,0 +1,112 @@
+/* ============================================================
+   AEGIS SOC — Design Tokens
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  /* ── Backgrounds ─────────────────────────────────────────── */
+  --bg-primary:    #070a10;
+  --bg-secondary:  #0b1119;
+  --bg-surface:    rgba(11, 17, 25, 0.65);
+  --bg-surface-hi: rgba(15, 23, 35, 0.80);
+  --bg-overlay:    rgba(7, 10, 16, 0.90);
+
+  /* ── Accent (Cyan) ───────────────────────────────────────── */
+  --accent:           #22d3ee;
+  --accent-dim:       rgba(34, 211, 238, 0.10);
+  --accent-mid:       rgba(34, 211, 238, 0.20);
+  --accent-glow:      rgba(34, 211, 238, 0.30);
+  --accent-glow-lg:   rgba(34, 211, 238, 0.15);
+  --accent-text:      #22d3ee;
+
+  /* ── Status Colors ──────────────────────────────────────── */
+  --ok:        #2dd4a7;
+  --ok-dim:    rgba(45, 212, 167, 0.12);
+  --ok-glow:   rgba(45, 212, 167, 0.25);
+
+  --warn:      #f5b94d;
+  --warn-dim:  rgba(245, 185, 77, 0.12);
+  --warn-glow: rgba(245, 185, 77, 0.25);
+
+  --crit:      #f4576a;
+  --crit-dim:  rgba(244, 87, 106, 0.12);
+  --crit-glow: rgba(244, 87, 106, 0.25);
+
+  --high:      #f97316;
+  --high-dim:  rgba(249, 115, 22, 0.12);
+
+  --med:       #eab308;
+  --med-dim:   rgba(234, 179, 8, 0.12);
+
+  --low:       #64748b;
+  --low-dim:   rgba(100, 116, 139, 0.12);
+
+  /* ── Text ───────────────────────────────────────────────── */
+  --text-hi:   #e7eef4;
+  --text-mid:  #93a4b5;
+  --text-lo:   #5c6b7c;
+  --text-accent: #22d3ee;
+
+  /* ── Borders ─────────────────────────────────────────────── */
+  --border-subtle:  rgba(34, 211, 238, 0.08);
+  --border-default: rgba(34, 211, 238, 0.14);
+  --border-active:  rgba(34, 211, 238, 0.40);
+  --border-crit:    rgba(244, 87, 106, 0.30);
+  --border-ok:      rgba(45, 212, 167, 0.25);
+
+  /* ── Glassmorphism ───────────────────────────────────────── */
+  --glass-blur:    blur(14px);
+  --glass-blur-sm: blur(8px);
+
+  /* ── Border Radius ───────────────────────────────────────── */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius:    12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* ── Sidebar ─────────────────────────────────────────────── */
+  --sidebar-width:     280px;
+  --sidebar-collapsed: 72px;
+  --topbar-height:     60px;
+
+  /* ── Spacing ─────────────────────────────────────────────── */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* ── Transitions ─────────────────────────────────────────── */
+  --t-fast: 120ms ease;
+  --t-med:  280ms cubic-bezier(0.4, 0, 0.2, 1);
+  --t-slow: 450ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── Typography ─────────────────────────────────────────── */
+  --font-ui:   'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  --fs-xs:  11px;
+  --fs-sm:  12px;
+  --fs-md:  13px;
+  --fs-base: 14px;
+  --fs-lg:  16px;
+  --fs-xl:  20px;
+  --fs-2xl: 24px;
+  --fs-3xl: 32px;
+
+  /* ── Shadows ─────────────────────────────────────────────── */
+  --shadow-sm:    0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md:    0 4px 16px rgba(0,0,0,0.5);
+  --shadow-lg:    0 8px 32px rgba(0,0,0,0.6);
+  --shadow-accent: 0 0 20px rgba(34, 211, 238, 0.15);
+  --shadow-crit:   0 0 16px rgba(244, 87, 106, 0.20);
+
+  /* ── Scrollbar ───────────────────────────────────────────── */
+  --scrollbar-w: 4px;
+  --scrollbar-track: rgba(255,255,255,0.03);
+  --scrollbar-thumb: rgba(34, 211, 238, 0.20);
+}

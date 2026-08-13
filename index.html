@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Aegis SOC — Security Operations Center dashboard powered by Wazuh SIEM/XDR. Real-time alerts, agent health, file integrity, and threat intelligence." />
+  <meta name="theme-color" content="#070a10" />
+  <title>Aegis SOC — Security Overview</title>
+
+  <!-- Lucide Icons (CDN) -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+  <!-- Monaco Editor (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"></script>
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/animations.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/states.css" />
+
+  <!-- Clean up legacy Service Workers from previous projects on localhost -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (var reg of registrations) {
+          reg.unregister().then(function(boolean) {
+            console.log('[AEGIS] Cleaned legacy ServiceWorker:', reg.scope, boolean);
+          });
+        }
+      });
+    }
+  </script>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     APP ROOT
+══════════════════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- ═══════════════════════════════════════════
+       SIDEBAR
+  ═══════════════════════════════════════════ -->
+  <aside id="sidebar" role="navigation" aria-label="Main navigation">
+
+    <!-- Brand -->
+    <div class="sidebar-brand">
+      <div class="brand-icon-wrap">
+        <svg class="shield-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.75"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <polyline points="9 12 11 14 15 10"/>
+        </svg>
+        <div class="brand-radar"></div>
+      </div>
+      <div class="brand-text">
+        <span class="brand-name">AEGIS SOC</span>
+        <span class="brand-sub">Security Platform</span>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="sidebar-nav" aria-label="Primary navigation">
+
+      <div id="nav-dashboard" class="nav-item active" role="button" tabindex="0"
+           aria-label="Dashboard" aria-current="page">
+        <i data-lucide="layout-dashboard"></i>
+        <span class="nav-label">Dashboard</span>
+        <span class="nav-tooltip">Dashboard</span>
+      </div>
+
+      <div id="nav-rules" class="nav-item" role="button" tabindex="0"
+           aria-label="Rules Management">
+        <i data-lucide="file-code-2"></i>
+        <span class="nav-label">Rules Management</span>
+        <span class="nav-tooltip">Rules Management</span>
+      </div>
+
+      <div id="nav-terminal" class="nav-item" role="button" tabindex="0"
+           aria-label="Server Console">
+        <i data-lucide="terminal"></i>
+        <span class="nav-label">Server Console</span>
+        <span class="nav-tooltip">Server Console</span>
+      </div>
+
+
+
+
+    </nav>
+
+    <!-- Footer -->
+    <div class="sidebar-footer">
+      <div class="sidebar-footer-icon">
+        <i data-lucide="radio"></i>
+      </div>
+      <div class="sidebar-footer-text">
+        <span class="footer-label">Sensors</span>
+        <span class="footer-value" id="sensor-count">— / — ONLINE</span>
+      </div>
+    </div>
+
+  </aside><!-- /sidebar -->
+
+  <!-- ═══════════════════════════════════════════
+       MAIN WRAPPER
+  ═══════════════════════════════════════════ -->
+  <div id="main-wrapper">
+
+    <!-- ── Topbar ──────────────────────────────────────── -->
+    <header id="topbar" role="banner">
+
+      <!-- Hamburger -->
+      <button id="sidebar-toggle" class="topbar-toggle"
+              aria-label="Toggle sidebar" aria-expanded="true">
+        <i data-lucide="menu"></i>
+      </button>
+
+      <!-- Breadcrumb -->
+      <div class="topbar-breadcrumb" aria-label="Breadcrumb">
+        <span class="breadcrumb-root">SOC</span>
+        <span class="breadcrumb-sep">/</span>
+        <span class="breadcrumb-current" id="breadcrumb-current">Security Overview</span>
+      </div>
+
+      <!-- Search -->
+      <div class="topbar-search" role="search">
+        <span class="search-icon" aria-hidden="true"><i data-lucide="search"></i></span>
+        <input
+          type="search"
+          id="search-input"
+          placeholder="Search incidents, hosts, IOCs…"
+          autocomplete="off"
+          aria-label="Search incidents, hosts, and IOCs"
+        />
+        <span class="search-shortcut" aria-hidden="true">/</span>
+      </div>
+
+      <!-- Right side controls -->
+      <div class="topbar-right">
+
+        <!-- Connection Status -->
+        <div id="conn-status" class="conn-status" data-state="not-connected"
+             role="status" aria-live="polite" aria-label="Wazuh connection status">
+          <span class="pulse-dot pulse-dot--dim" aria-hidden="true"></span>
+          <span class="conn-status-text">NOT CONNECTED</span>
+        </div>
+
+        <!-- SSH Tunnel Toggle Button -->
+        <button id="tunnel-btn" class="tunnel-btn" data-state="closed"
+                aria-label="Toggle SSH reverse tunnel" title="Open SSH Tunnel to Wazuh Server">
+          <span class="tunnel-btn-dot" aria-hidden="true"></span>
+          <i data-lucide="cable" aria-hidden="true"></i>
+          <span class="tunnel-btn-text">Open Tunnel</span>
+        </button>
+
+
+        <!-- Notification Bell -->
+        <button id="bell-btn" class="topbar-icon-btn"
+                aria-label="Notifications">
+          <i data-lucide="bell"></i>
+        </button>
+
+
+        <!-- Account -->
+        <div style="position:relative;">
+          <button id="account-btn" class="account-btn"
+                  aria-label="Account menu" aria-haspopup="true" aria-expanded="false">
+            <div class="account-avatar" aria-hidden="true">AD</div>
+            <span class="account-name">Admin</span>
+            <span class="account-chevron" aria-hidden="true"><i data-lucide="chevron-down"></i></span>
+          </button>
+
+          <div id="account-dropdown" class="account-dropdown" role="menu" aria-label="Account options">
+            <div class="dropdown-item" role="menuitem" tabindex="-1">
+              <i data-lucide="user"></i>
+              Profile
+            </div>
+            <div class="dropdown-item" id="dropdown-settings" role="menuitem" tabindex="-1">
+              <i data-lucide="settings"></i>
+              Settings
+            </div>
+            <div class="dropdown-divider" role="separator"></div>
+            <div class="dropdown-item danger" role="menuitem" tabindex="-1">
+              <i data-lucide="log-out"></i>
+              Logout
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /topbar-right -->
+    </header><!-- /topbar -->
+
+    <!-- ── Main Content ────────────────────────────────── -->
+    <main id="main-content" role="main" aria-label="Security overview dashboard">
+
+      <!-- ════════════════════════════════════════════
+           DASHBOARD VIEW
+      ════════════════════════════════════════════ -->
+      <div id="view-dashboard" style="display: flex; flex-direction: column; gap: var(--sp-5);">
+
+      <!-- ════════════════════════════════════════════
+           TIME RANGE PICKER BAR
+      ════════════════════════════════════════════ -->
+      <div class="tr-bar" id="time-range-bar" aria-label="Time range selector">
+
+        <!-- Left: calendar icon + active range label -->
+        <div class="tr-bar-left">
+          <i data-lucide="calendar-range" class="tr-cal-icon"></i>
+          <button id="tr-trigger" class="tr-trigger" aria-haspopup="true" aria-expanded="false" aria-label="Open time range picker">
+            <span id="tr-label">Last 24 hours</span>
+            <i data-lucide="chevron-down" class="tr-chevron"></i>
+          </button>
+        </div>
+
+        <!-- Right: prev / next / refresh -->
+        <div class="tr-bar-right">
+          <button id="tr-prev" class="tr-nav-btn" title="Previous time window" aria-label="Previous period">
+            <i data-lucide="chevron-left"></i>
+          </button>
+          <button id="tr-next" class="tr-nav-btn" title="Next time window" aria-label="Next period">
+            <i data-lucide="chevron-right"></i>
+          </button>
+          <button id="tr-refresh" class="tr-nav-btn tr-nav-btn--refresh" title="Refresh" aria-label="Refresh dashboard">
+            <i data-lucide="refresh-cw"></i>
+          </button>
+        </div>
+
+        <!-- Dropdown panel -->
+        <div id="tr-dropdown" class="tr-dropdown" role="dialog" aria-label="Time range panel" style="display:none;">
+
+          <!-- Tabs: Quick | Absolute -->
+          <div class="tr-tabs">
+            <button class="tr-tab active" data-tab="quick">Quick select</button>
+            <button class="tr-tab" data-tab="absolute">Absolute</button>
+          </div>
+
+          <!-- Quick select panel -->
+          <div class="tr-tab-panel active" data-panel="quick">
+            <p class="tr-section-label">Commonly used</p>
+            <div class="tr-quick-grid">
+              <button class="tr-quick-btn" data-minutes="15">Last 15 minutes</button>
+              <button class="tr-quick-btn" data-minutes="30">Last 30 minutes</button>
+              <button class="tr-quick-btn" data-minutes="60">Last 1 hour</button>
+              <button class="tr-quick-btn" data-minutes="180">Last 3 hours</button>
+              <button class="tr-quick-btn" data-minutes="360">Last 6 hours</button>
+              <button class="tr-quick-btn" data-minutes="720">Last 12 hours</button>
+              <button class="tr-quick-btn" data-minutes="1440" data-active="true">Last 24 hours</button>
+              <button class="tr-quick-btn" data-minutes="2880">Last 2 days</button>
+              <button class="tr-quick-btn" data-minutes="10080">Last 7 days</button>
+              <button class="tr-quick-btn" data-minutes="43200">Last 30 days</button>
+              <button class="tr-quick-btn" data-minutes="131040">Last 90 days</button>
+              <button class="tr-quick-btn" data-minutes="525960">Last 1 year</button>
+            </div>
+            <p class="tr-section-label" style="margin-top:12px;">Presets</p>
+            <div class="tr-quick-grid">
+              <button class="tr-quick-btn" data-preset="all-time" data-active="true">All time (ทั้งหมด)</button>
+              <button class="tr-quick-btn" data-preset="today">Today</button>
+              <button class="tr-quick-btn" data-preset="this-week">This week</button>
+              <button class="tr-quick-btn" data-preset="this-month">This month</button>
+            </div>
+          </div>
+
+          <!-- Absolute panel -->
+          <div class="tr-tab-panel" data-panel="absolute">
+            <div class="tr-abs-row">
+              <div class="tr-abs-col">
+                <label class="tr-abs-label">From</label>
+                <input type="datetime-local" id="tr-from" class="tr-abs-input" />
+              </div>
+              <div class="tr-abs-col">
+                <label class="tr-abs-label">To</label>
+                <input type="datetime-local" id="tr-to" class="tr-abs-input" />
+              </div>
+            </div>
+            <button id="tr-abs-apply" class="tr-apply-btn">Apply Range</button>
+          </div>
+
+        </div><!-- /tr-dropdown -->
+      </div><!-- /time-range-bar -->
+
+      <!-- ════════════════════════════════════════════
+           KPI STRIP
+      ════════════════════════════════════════════ -->
+      <section class="kpi-strip" aria-label="Key performance indicators">
+
+        <!-- KPI 1: Critical Alerts -->
+        <article id="kpi-critical-alerts" class="kpi-card" data-state="loading"
+                 aria-label="Critical alerts KPI">
+          <div class="kpi-card-header">
+            <span class="kpi-card-label">Critical Alerts</span>
+            <div class="kpi-icon kpi-icon--crit" aria-hidden="true">
+              <i data-lucide="shield-alert"></i>
+            </div>
+          </div>
+          <!-- Skeleton -->
+          <div class="kpi-skel-value skeleton"></div>
+          <!-- Value (shown in empty/data state) -->
+          <div class="kpi-value" aria-label="Critical alerts count">—</div>
+          <!-- Skeleton delta -->
+          <div class="kpi-skel-delta skeleton"></div>
+          <!-- Delta -->
+          <div class="kpi-delta kpi-delta--flat" aria-label="Change since last period">
+            <i data-lucide="minus" aria-hidden="true"></i>
+            <span class="kpi-delta-text">awaiting Wazuh data</span>
+          </div>
+        </article>
+
+        <!-- KPI 2: Blind Spots -->
+        <article id="kpi-blind-spots" class="kpi-card" data-state="loading"
+                 aria-label="Blind spots KPI">
+          <div class="kpi-card-header">
+            <span class="kpi-card-label">Blind Spots</span>
+            <div class="kpi-icon kpi-icon--crit" aria-hidden="true">
+              <i data-lucide="eye-off"></i>
+            </div>
+          </div>
+          <div class="kpi-skel-value skeleton"></div>
+          <div class="kpi-value" aria-label="Blind spots count">—</div>
+          <div class="kpi-skel-delta skeleton"></div>
+          <div class="kpi-delta kpi-delta--flat">
+            <i data-lucide="minus" aria-hidden="true"></i>
+            <span class="kpi-delta-text">awaiting Wazuh data</span>
+          </div>
+        </article>
+
+        <!-- KPI 3: File / System Changes -->
+        <article id="kpi-file-changes" class="kpi-card" data-state="loading"
+                 aria-label="File and system changes KPI">
+          <div class="kpi-card-header">
+            <span class="kpi-card-label">File / System Changes</span>
+            <div class="kpi-icon kpi-icon--warn" aria-hidden="true">
+              <i data-lucide="file-pen-line"></i>
+            </div>
+          </div>
+          <div class="kpi-skel-value skeleton"></div>
+          <div class="kpi-value" aria-label="File and system changes count">—</div>
+          <div class="kpi-skel-delta skeleton"></div>
+          <div class="kpi-delta kpi-delta--flat">
+            <i data-lucide="minus" aria-hidden="true"></i>
+            <span class="kpi-delta-text">awaiting Wazuh data</span>
+          </div>
+        </article>
+
+        <!-- KPI 4: Access Anomalies -->
+        <article id="kpi-access-anomalies" class="kpi-card" data-state="loading"
+                 aria-label="Access anomalies KPI">
+          <div class="kpi-card-header">
+            <span class="kpi-card-label">Access Anomalies</span>
+            <div class="kpi-icon kpi-icon--warn" aria-hidden="true">
+              <i data-lucide="user-x"></i>
+            </div>
+          </div>
+          <div class="kpi-skel-value skeleton"></div>
+          <div class="kpi-value" aria-label="Access anomalies count">—</div>
+          <div class="kpi-skel-delta skeleton"></div>
+          <div class="kpi-delta kpi-delta--flat">
+            <i data-lucide="minus" aria-hidden="true"></i>
+            <span class="kpi-delta-text">awaiting Wazuh data</span>
+          </div>
+        </article>
+
+        <!-- KPI 5: Threat Intel Matches -->
+        <article id="kpi-threat-intel" class="kpi-card" data-state="loading"
+                 aria-label="Threat intelligence matches KPI">
+          <div class="kpi-card-header">
+            <span class="kpi-card-label">Threat Intel Matches</span>
+            <div class="kpi-icon kpi-icon--accent" aria-hidden="true">
+              <i data-lucide="crosshair"></i>
+            </div>
+          </div>
+          <div class="kpi-skel-value skeleton"></div>
+          <div class="kpi-value" aria-label="Threat intel matches count">—</div>
+          <div class="kpi-skel-delta skeleton"></div>
+          <div class="kpi-delta kpi-delta--flat">
+            <i data-lucide="minus" aria-hidden="true"></i>
+            <span class="kpi-delta-text">awaiting Wazuh data</span>
+          </div>
+        </article>
+
+      </section><!-- /kpi-strip -->
+
+      <!-- ════════════════════════════════════════════
+           PANEL GRID
+      ════════════════════════════════════════════ -->
+      <div class="panel-grid" aria-label="Security data panels">
+
+        <!-- ── LEFT COLUMN ──────────────────────── -->
+        <div class="panel-col">
+
+          <!-- ── PANEL 1: Critical Alerts ─────── -->
+          <section id="panel-critical-alerts" class="panel"
+                   aria-label="Critical alerts panel">
+            <header class="panel-header">
+              <div class="panel-header-icon panel-header-icon--crit" aria-hidden="true">
+                <i data-lucide="shield-alert"></i>
+              </div>
+              <h2 class="panel-title">Critical Alerts</h2>
+              <span class="panel-count-badge" aria-label="Alert count">0</span>
+              <button class="panel-refresh-btn" aria-label="Refresh critical alerts">
+                <i data-lucide="refresh-cw"></i>
+              </button>
+            </header>
+            <div class="panel-body">
+
+              <!-- Loading -->
+              <div class="panel-state state-loading active">
+                <div class="skel-rows">
+                  <div class="skel-row">
+                    <div class="skel-dot skeleton"></div>
+                    <div class="skel-body">
+                      <div class="skel-line skel-line-lg skeleton"></div>
+                      <div class="skel-line skel-line-md skeleton"></div>
+                    </div>
+                    <div class="skel-chip skeleton"></div>
+                    <div class="skel-time skeleton"></div>
+                  </div>
+                  <div class="skel-row">
+                    <div class="skel-dot skeleton"></div>
+                    <div class="skel-body">
+                      <div class="skel-line skel-line-lg skeleton" style="width:55%;"></div>
+                      <div class="skel-line skel-line-md skeleton" style="width:35%;"></div>
+                    </div>
+                    <div class="skel-chip skeleton"></div>
+                    <div class="skel-time skeleton"></div>
+                  </div>
+                  <div class="skel-row">
+                    <div class="skel-dot skeleton"></div>
+                    <div class="skel-body">
+                      <div class="skel-line skel-line-lg skeleton" style="width:70%;"></div>
+                      <div class="skel-line skel-line-md skeleton" style="width:45%;"></div>
+                    </div>
+                    <div class="skel-chip skeleton"></div>
+                    <div class="skel-time skeleton"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Empty -->
+              <div class="panel-state state-empty">
+                <div class="empty-icon empty-icon--ok">
+                  <i data-lucide="shield-check"></i>
+                </div>
+                <p class="empty-title">No critical alerts</p>
+                <p class="empty-sub">System is clear — no high-severity alerts to display.</p>
+              </div>
+
+              <!-- Error -->
+              <div class="panel-state state-error">
+                <div class="error-box">
+                  <div class="error-box-icon"><i data-lucide="alert-circle"></i></div>
+                  <div class="error-box-content">
+                    <p class="error-box-title">Failed to load alerts</p>
+                    <p class="error-box-body">
+                      Could not reach Wazuh API. Verify the connection and try again.
+                    </p>
+                    <button class="error-retry-btn" aria-label="Retry loading critical alerts">
+                      <i data-lucide="refresh-cw"></i>
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Data (populated rows — rendered by panels.js / future API) -->
+              <div class="panel-state state-data">
+                <div class="data-rows" id="critical-alerts-rows" aria-label="Critical alert items">
+                  <!-- Rows injected by panels.js when Wazuh is connected -->
+                </div>
+              </div>
+
+            </div><!-- /panel-body -->
+          </section><!-- /panel-critical-alerts -->
+
+          <!-- ── PANEL 2: File & System Changes ─ -->
+          <section id="panel-file-changes" class="panel"
+                   aria-label="Critical file and system changes panel">
+            <header class="panel-header">
+              <div class="panel-header-icon panel-header-icon--warn" aria-hidden="true">
+                <i data-lucide="file-pen-line"></i>
+              </div>
+              <h2 class="panel-title">Critical File & System Changes</h2>
+              <span class="panel-count-badge" aria-label="Change count">0</span>
+              <button class="panel-refresh-btn" aria-label="Refresh file integrity events">
+                <i data-lucide="refresh-cw"></i>
+              </button>
+            </header>
+            <div class="panel-body">
+
+              <!-- Loading -->
+              <div class="panel-state state-loading active">
+                <div class="skel-rows">
+                  <div class="skel-row">
+                    <div class="skel-dot skeleton"></div>
+                    <div class="skel-body">
+                      <div class="skel-line skel-line-lg skeleton"></div>
+                      <div class="skel-line skel-line-md skeleton"></div>
+                    </div>
+                    <div class="skel-chip skeleton"></div>
+                    <div class="skel-time skeleton"></div>
+                  </div>
+                  <div class="skel-row">
+                    <div class="skel-dot skeleton"></div>
+                    <div class="skel-body">
+                      <div class="skel-line skel-line-lg skeleton" style="width:60%;"></div>
+                      <div class="skel-line skel-line-md skeleton" style="width:30%;"></div>
+                    </div>
+                    <div class="skel-chip skeleton"></div>
+                    <div class="skel-time skeleton"></div>
+                  </div>
+                  <div class="skel-row">
+                    <div class="skel-dot skeleton"></div>
+                    <div class="skel-body">
+                      <div class="skel-line skel-line-lg skeleton" style="width:50%;"></div>
+                      <div class="skel-line skel-line-md skeleton" style="width:40%;"></div>
+                    </div>
+                    <div class="skel-chip skeleton"></div>
+                    <div class="skel-time skeleton"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Empty -->
+              <div class="panel-state state-empty">
+                <div class="empty-icon empty-icon--ok">
+                  <i data-lucide="file-check-2"></i>
+                </div>
+                <p class="empty-title">No integrity violations detected</p>
+                <p class="empty-sub">File Integrity Monitoring reports no critical changes.</p>
+              </div>
+
+              <!-- Error -->
+              <div class="panel-state state-error">
+                <div class="error-box">
+                  <div class="error-box-icon"><i data-lucide="alert-circle"></i></div>
+                  <div class="error-box-content">
+                    <p class="error-box-title">Failed to load FIM events</p>
+                    <p class="error-box-body">
+                      Could not fetch syscheck data. Check the Wazuh connection.
+                    </p>
+                    <button class="error-retry-btn" aria-label="Retry loading FIM events">
+                      <i data-lucide="refresh-cw"></i>
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Data -->
+              <div class="panel-state state-data">
+                <div class="data-rows" id="file-changes-rows" aria-label="File change items">
+                  <!-- Rows injected by panels.js when Wazuh is connected -->
+                </div>
+              </div>
+
+            </div>
+          </section><!-- /panel-file-changes -->
+
+        </div><!-- /panel-col left -->
+
+        <!-- ── RIGHT COLUMN ─────────────────────── -->
+        <div class="panel-col">
+
+          <!-- ── PANEL 3: Blind Spots & Agent Health -->
+          <section id="panel-blind-spots" class="panel"
+                   aria-label="Blind spots and agent health panel">
+            <header class="panel-header">
+              <div class="panel-header-icon panel-header-icon--crit" aria-hidden="true">
+                <i data-lucide="eye-off"></i>
+              </div>
+              <h2 class="panel-title">Blind Spots & Agent Health</h2>
+              <span class="panel-count-badge" aria-label="Offline agent count">0</span>
+              <button class="panel-refresh-btn" aria-label="Refresh agent status">
+                <i data-lucide="refresh-cw"></i>
+              </button>
+            </header>
+            <div class="panel-body">
+
+              <!-- Loading -->
+              <div class="panel-state state-loading active">
+                <div class="skel-rows">
+                  <div class="skel-row">
+                    <div class="skel-dot skeleton"></div>
+                    <div class="skel-body">
+                      <div class="skel-line skel-line-lg skeleton" style="width:60%;"></div>
+                      <div class="skel-line skel-line-md skeleton"></div>
+                    </div>
+                    <div class="skel-chip skeleton" style="width:50px;"></div>
+                  </div>
+                  <div class="skel-row">
+                    <div class="skel-dot skeleton"></div>
+                    <div class="skel-body">
+                      <div class="skel-line skel-line-lg skeleton" style="width:45%;"></div>
+                      <div class="skel-line skel-line-md skeleton" style="width:55%;"></div>
+                    </div>
+                    <div class="skel-chip skeleton" style="width:50px;"></div>
+                  </div>
+                  <div class="skel-row">
+                    <div class="skel-dot skeleton"></div>
+                    <div class="skel-body">
+                      <div class="skel-line skel-line-lg skeleton" style="width:55%;"></div>
+                      <div class="skel-line skel-line-md skeleton" style="width:40%;"></div>
+                    </div>
+                    <div class="skel-chip skeleton" style="width:60px;"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Empty -->
+              <div class="panel-state state-empty">
+                <div class="empty-icon empty-icon--ok">
+                  <i data-lucide="eye"></i>
+                </div>
+                <p class="empty-title">Full visibility</p>
+                <p class="empty-sub">All agents are reporting — no blind spots detected.</p>
+              </div>
+
+              <!-- Error -->
+              <div class="panel-state state-error">
+                <div class="error-box">
+                  <div class="error-box-icon"><i data-lucide="alert-circle"></i></div>
+                  <div class="error-box-content">
+                    <p class="error-box-title">Failed to load agent data</p>
+                    <p class="error-box-body">
+                      Agent status unavailable. Check the Wazuh API connection.
+                    </p>
+                    <button class="error-retry-btn" aria-label="Retry loading agent data">
+                      <i data-lucide="refresh-cw"></i>
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Data -->
+              <div class="panel-state state-data">
+                <div class="data-rows" id="blind-spots-rows" aria-label="Offline agent items">
+                  <!-- Rows injected by panels.js when Wazuh is connected -->
+                </div>
+              </div>
+
+            </div>
+          </section><!-- /panel-blind-spots -->
+
+          <!-- ── PANEL 4: Auth & Access Anomalies -->
+          <section id="panel-auth-anomalies" class="panel"
+                   aria-label="Authentication and access anomalies panel">
+            <header class="panel-header">
+              <div class="panel-header-icon panel-header-icon--warn" aria-hidden="true">
+                <i data-lucide="user-x"></i>
+              </div>
+              <h2 class="panel-title">Authentication & Access Anomalies</h2>
+              <span class="panel-count-badge" aria-label="Anomaly count">0</span>
+              <button class="panel-refresh-btn" aria-label="Refresh authentication anomalies">
+                <i data-lucide="refresh-cw"></i>
+              </button>
+            </header>
+            <div class="panel-body">
+
+              <!-- Loading -->
+              <div class="panel-state state-loading active">
+                <div class="skel-rows">
+                  <div class="skel-row">
+                    <div class="skel-dot skeleton"></div>
+                    <div class="skel-body">
+                      <div class="skel-line skel-line-lg skeleton" style="width:70%;"></div>
+                      <div class="skel-line skel-line-md skeleton" style="width:45%;"></div>
+                    </div>
+                    <div class="skel-chip skeleton"></div>
+                    <div class="skel-time skeleton"></div>
+                  </div>
+                  <div class="skel-row">
+                    <div class="skel-dot skeleton"></div>
+                    <div class="skel-body">
+                      <div class="skel-line skel-line-lg skeleton" style="width:55%;"></div>
+                      <div class="skel-line skel-line-md skeleton" style="width:35%;"></div>
+                    </div>
+                    <div class="skel-chip skeleton"></div>
+                    <div class="skel-time skeleton"></div>
+                  </div>
+                  <div class="skel-row">
+                    <div class="skel-dot skeleton"></div>
+                    <div class="skel-body">
+                      <div class="skel-line skel-line-lg skeleton" style="width:60%;"></div>
+                      <div class="skel-line skel-line-md skeleton" style="width:40%;"></div>
+                    </div>
+                    <div class="skel-chip skeleton"></div>
+                    <div class="skel-time skeleton"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Empty -->
+              <div class="panel-state state-empty">
+                <div class="empty-icon empty-icon--ok">
+                  <i data-lucide="shield-check"></i>
+                </div>
+                <p class="empty-title">No access anomalies detected</p>
+                <p class="empty-sub">Authentication activity looks normal — no anomalies found.</p>
+              </div>
+
+              <!-- Error -->
+              <div class="panel-state state-error">
+                <div class="error-box">
+                  <div class="error-box-icon"><i data-lucide="alert-circle"></i></div>
+                  <div class="error-box-content">
+                    <p class="error-box-title">Failed to load auth data</p>
+                    <p class="error-box-body">
+                      Authentication alerts unavailable. Check the Wazuh connection.
+                    </p>
+                    <button class="error-retry-btn" aria-label="Retry loading auth anomalies">
+                      <i data-lucide="refresh-cw"></i>
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Data -->
+              <div class="panel-state state-data">
+                <div class="data-rows" id="auth-anomalies-rows" aria-label="Authentication anomaly items">
+                  <!-- Rows injected by panels.js when Wazuh is connected -->
+                </div>
+              </div>
+
+            </div>
+          </section><!-- /panel-auth-anomalies -->
+
+          <!-- ── PANEL 5: Threat Intelligence Matches -->
+          <section id="panel-threat-intel" class="panel"
+                   aria-label="Threat intelligence matches panel">
+            <header class="panel-header">
+              <div class="panel-header-icon panel-header-icon--accent" aria-hidden="true">
+                <i data-lucide="crosshair"></i>
+              </div>
+              <h2 class="panel-title">Threat Intelligence Matches</h2>
+              <span class="panel-count-badge" aria-label="Match count">0</span>
+              <button class="panel-refresh-btn" aria-label="Refresh threat intelligence">
+                <i data-lucide="refresh-cw"></i>
+              </button>
+            </header>
+            <div class="panel-body">
+
+              <!-- Loading -->
+              <div class="panel-state state-loading active">
+                <div class="skel-rows" style="padding: 8px 0;">
+                  <div class="skel-threat-row">
+                    <div class="skel-threat-header">
+                      <div class="skel-feed-name skeleton"></div>
+                      <div class="skel-pct skeleton"></div>
+                    </div>
+                    <div class="skel-bar skeleton"></div>
+                  </div>
+                  <div class="skel-threat-row">
+                    <div class="skel-threat-header">
+                      <div class="skel-feed-name skeleton" style="width:45%;"></div>
+                      <div class="skel-pct skeleton"></div>
+                    </div>
+                    <div class="skel-bar skeleton"></div>
+                  </div>
+                  <div class="skel-threat-row">
+                    <div class="skel-threat-header">
+                      <div class="skel-feed-name skeleton" style="width:60%;"></div>
+                      <div class="skel-pct skeleton"></div>
+                    </div>
+                    <div class="skel-bar skeleton"></div>
+                  </div>
+                  <div class="skel-threat-row">
+                    <div class="skel-threat-header">
+                      <div class="skel-feed-name skeleton" style="width:50%;"></div>
+                      <div class="skel-pct skeleton"></div>
+                    </div>
+                    <div class="skel-bar skeleton"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Empty -->
+              <div class="panel-state state-empty">
+                <div class="empty-icon empty-icon--ok">
+                  <i data-lucide="check-circle-2"></i>
+                </div>
+                <p class="empty-title">No threat intel matches</p>
+                <p class="empty-sub">No IOCs matched across configured threat feeds.</p>
+              </div>
+
+              <!-- Error -->
+              <div class="panel-state state-error">
+                <div class="error-box">
+                  <div class="error-box-icon"><i data-lucide="alert-circle"></i></div>
+                  <div class="error-box-content">
+                    <p class="error-box-title">Failed to load threat feeds</p>
+                    <p class="error-box-body">
+                      Threat intelligence data unavailable. Check the Wazuh connection.
+                    </p>
+                    <button class="error-retry-btn" aria-label="Retry loading threat intelligence">
+                      <i data-lucide="refresh-cw"></i>
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Data (progress bars — rendered by panels.js) -->
+              <div class="panel-state state-data">
+                <div class="threat-rows" id="threat-intel-rows" aria-label="Threat feed match items">
+                  <!--
+                    Future structure per feed (rendered by panels.js):
+                    <div class="threat-row">
+                      <div class="threat-row-header">
+                        <span class="threat-feed-name">APT IOC Set</span>
+                        <span class="threat-pct">0%</span>
+                      </div>
+                      <div class="threat-bar-track">
+                        <div class="threat-bar-fill" style="--target-w: 0%;"></div>
+                      </div>
+                    </div>
+                  -->
+                </div>
+              </div>
+
+            </div>
+          </section><!-- /panel-threat-intel -->
+
+        </div><!-- /panel-col right -->
+
+      </div><!-- /panel-grid -->
+
+      </div><!-- /view-dashboard -->
+
+      <!-- ════════════════════════════════════════════
+           SETTINGS VIEW (EMPTY PLACEHOLDER)
+      ════════════════════════════════════════════ -->
+      <div id="view-settings" style="display: none; flex-direction: column; gap: var(--sp-5);">
+
+        <!-- Header Card -->
+        <div class="settings-header-card">
+          <div class="settings-title-group">
+            <div class="settings-header-icon">
+              <i data-lucide="sliders"></i>
+            </div>
+            <div class="settings-title-text">
+              <h1>Platform Settings</h1>
+              <p>Configure SOC system preferences, authentication, telemetry integrations, and retention rules.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════
+             WAZUH INTEGRATION SECTION
+        ═══════════════════════════════════════════ -->
+        <section id="settings-integrations" aria-label="Wazuh integration settings">
+
+          <!-- Section Heading -->
+          <div class="settings-section-header">
+            <div class="settings-section-icon">
+              <i data-lucide="plug"></i>
+            </div>
+            <div class="settings-section-text">
+              <div class="settings-section-title-row">
+                <h2 class="settings-section-title">Wazuh SIEM / XDR</h2>
+                <div id="int-wazuh-badge" class="int-status-badge int-status-badge--disconnected">
+                  <span class="int-badge-dot"></span>
+                  <span class="int-badge-text">NOT CONNECTED</span>
+                </div>
+              </div>
+              <p class="settings-section-sub">Security Information & Event Management integration settings</p>
+            </div>
+          </div>
+
+          <!-- 2-Column Grid -->
+          <div class="int-grid">
+
+            <!-- LEFT CARD: Connection Details -->
+            <div class="int-card">
+              <div class="int-card-header">
+                <div class="int-card-title-group">
+                  <h3 class="int-card-title">Connection Details</h3>
+                  <p class="int-card-subtitle">Enter your Wazuh Manager endpoint information</p>
+                </div>
+              </div>
+
+              <div class="int-card-body">
+                <!-- Manager API URL -->
+                <div class="int-field">
+                  <label class="int-label" for="wazuh-api-url">
+                    <span>Manager API URL <span class="int-label-required">*</span></span>
+                    <i data-lucide="info" class="int-info-icon" title="Wazuh Manager API hostname or IP address"></i>
+                  </label>
+                  <div class="int-input-group">
+                    <select id="wazuh-api-proto" class="int-select-proto" aria-label="Protocol">
+                      <option value="https://">https://</option>
+                      <option value="http://">http://</option>
+                    </select>
+                    <div class="int-input-wrap int-input-wrap--proto">
+                      <input
+                        type="text"
+                        id="wazuh-api-url"
+                        class="int-input"
+                        placeholder="wazuh-manager or IP address"
+                        value="wazuh-manager"
+                        autocomplete="off"
+                        spellcheck="false"
+                        aria-label="Wazuh Manager API URL"
+                        aria-required="true"
+                      />
+                    </div>
+                  </div>
+                  <span class="int-field-hint">Example: 10.145.10.58 or wazuh-manager</span>
+                </div>
+
+                <!-- Port -->
+                <div class="int-field">
+                  <label class="int-label" for="wazuh-api-port">
+                    <span>Port <span class="int-label-required">*</span></span>
+                    <i data-lucide="info" class="int-info-icon" title="Wazuh Manager API Port"></i>
+                  </label>
+                  <div class="int-input-wrap">
+                    <input
+                      type="number"
+                      id="wazuh-api-port"
+                      class="int-input int-input--plain"
+                      value="55000"
+                      min="1"
+                      max="65535"
+                      aria-label="Wazuh API port"
+                    />
+                  </div>
+                  <span class="int-field-hint">Default port is 55000</span>
+                </div>
+
+                <!-- Security Sub-Card -->
+                <div class="int-subcard">
+                  <div class="int-subcard-header">
+                    <span class="int-subcard-title">Security</span>
+                  </div>
+                  <div class="int-checkbox-wrap-custom">
+                    <label class="int-checkbox-label-custom" for="wazuh-ssl-verify">
+                      <input
+                        type="checkbox"
+                        id="wazuh-ssl-verify"
+                        class="int-checkbox"
+                        checked
+                        aria-label="Verify SSL certificate"
+                      />
+                      <span class="int-checkbox-box" aria-hidden="true"></span>
+                      <span class="int-checkbox-text-group">
+                        <span class="int-checkbox-title-row">
+                          Verify SSL Certificate
+                          <span class="int-badge-recommended">Recommended</span>
+                        </span>
+                        <span class="int-field-hint">Enable for production environments with valid SSL certificates</span>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Webhook Secret -->
+                <div class="int-field">
+                  <label class="int-label" for="wazuh-webhook-secret">
+                    <span>Webhook Secret</span>
+                    <i data-lucide="info" class="int-info-icon" title="Shared secret for authenticating Wazuh push events. Set the same value as AEGIS_WEBHOOK_SECRET on the server and in the Wazuh custom-aegis integration script."></i>
+                  </label>
+                  <div class="int-input-wrap">
+                    <span class="int-input-icon"><i data-lucide="key-round"></i></span>
+                    <input
+                      type="password"
+                      id="wazuh-webhook-secret"
+                      class="int-input int-input--mono"
+                      placeholder="e.g. a7f3c9e2b1d8f5a4…"
+                      autocomplete="off"
+                      spellcheck="false"
+                      aria-label="Webhook shared secret"
+                    />
+                  </div>
+                  <span class="int-field-hint">Used in <code style="font-family:var(--font-mono);font-size:10px;color:var(--accent)">Authorization: Bearer &lt;secret&gt;</code> header — must match the server and Wazuh ossec.conf</span>
+                </div>
+
+              </div><!-- /int-card-body -->
+            </div><!-- /int-card left -->
+
+
+            <!-- RIGHT CARD: Authentication -->
+            <div class="int-card">
+              <div class="int-card-header">
+                <div class="int-card-title-group">
+                  <h3 class="int-card-title">Authentication</h3>
+                  <p class="int-card-subtitle">Choose your authentication method</p>
+                </div>
+              </div>
+
+              <div class="int-card-body">
+                <!-- Segmented Tab Control -->
+                <div class="int-auth-toggle" role="group" aria-label="Authentication method">
+                  <button
+                    id="auth-toggle-userpass"
+                    class="int-auth-tab active"
+                    data-auth="userpass"
+                    aria-pressed="true"
+                    type="button"
+                  >
+                    <i data-lucide="user"></i>
+                    Username / Password
+                  </button>
+                  <button
+                    id="auth-toggle-token"
+                    class="int-auth-tab"
+                    data-auth="token"
+                    aria-pressed="false"
+                    type="button"
+                  >
+                    <i data-lucide="key"></i>
+                    API Token (JWT)
+                  </button>
+                </div>
+
+                <!-- Panel A: Userpass -->
+                <div id="auth-fields-userpass" class="int-auth-panel" data-panel="userpass">
+                  <div class="int-field">
+                    <label class="int-label" for="wazuh-username">
+                      <span>Username <span class="int-label-required">*</span></span>
+                      <i data-lucide="info" class="int-info-icon" title="Wazuh API user name"></i>
+                    </label>
+                    <div class="int-input-wrap">
+                      <span class="int-input-icon"><i data-lucide="user"></i></span>
+                      <input
+                        type="text"
+                        id="wazuh-username"
+                        class="int-input"
+                        placeholder="e.g. wazuh-wui or admin"
+                        autocomplete="username"
+                        aria-label="Wazuh API username"
+                      />
+                    </div>
+                    <span id="wazuh-username-warning" class="int-field-hint" style="color:#f4576a;display:none;"></span>
+                  </div>
+
+                  <div class="int-field">
+                    <label class="int-label" for="wazuh-password">
+                      <span>Password <span class="int-label-required">*</span></span>
+                      <i data-lucide="info" class="int-info-icon" title="Wazuh API user password"></i>
+                    </label>
+                    <div class="int-input-wrap">
+                      <span class="int-input-icon"><i data-lucide="lock"></i></span>
+                      <input
+                        type="password"
+                        id="wazuh-password"
+                        class="int-input"
+                        placeholder="Enter API password"
+                        autocomplete="current-password"
+                        aria-label="Wazuh API password"
+                      />
+                      <button class="int-input-reveal" id="password-reveal-btn" aria-label="Toggle password visibility" type="button">
+                        <i data-lucide="eye"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Panel B: Token -->
+                <div id="auth-fields-token" class="int-auth-panel" data-panel="token" style="display:none;">
+                  <div class="int-field">
+                    <label class="int-label" for="wazuh-jwt-token">
+                      <span>JWT Token <span class="int-label-required">*</span></span>
+                      <i data-lucide="info" class="int-info-icon" title="Bearer token for Wazuh API"></i>
+                    </label>
+                    <div class="int-input-wrap">
+                      <span class="int-input-icon"><i data-lucide="shield-check"></i></span>
+                      <input
+                        type="password"
+                        id="wazuh-jwt-token"
+                        class="int-input int-input--mono"
+                        placeholder="eyJhbGciOiJFUzUxMiIsInR5cCI6IkpXVCJ9…"
+                        autocomplete="off"
+                        spellcheck="false"
+                        aria-label="Wazuh API JWT token"
+                      />
+                      <button class="int-input-reveal" id="token-reveal-btn" aria-label="Toggle token visibility" type="button">
+                        <i data-lucide="eye"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Callout Box -->
+                <div class="int-callout">
+                  <div class="int-callout-icon">
+                    <i data-lucide="info"></i>
+                  </div>
+                  <div class="int-callout-content">
+                    <p>For API Token authentication, create a JWT token in your Wazuh Manager</p>
+                    <a href="#" class="int-callout-link" onclick="event.preventDefault();">Learn how to generate API tokens →</a>
+                  </div>
+                </div>
+
+              </div><!-- /int-card-body -->
+            </div><!-- /int-card right -->
+
+          </div><!-- /int-grid -->
+
+          <!-- FULL-WIDTH CARD: Test Connection -->
+          <div class="int-card int-card--test">
+            <div class="int-test-card-body">
+              <div class="int-test-title-group">
+                <h3 class="int-card-title">Test Connection</h3>
+                <p class="int-card-subtitle">Verify your connection settings and credentials</p>
+              </div>
+
+              <div class="int-test-meta">
+                <i data-lucide="clock" class="int-meta-icon"></i>
+                <span id="int-last-tested" class="int-meta-text">Last tested: Never</span>
+              </div>
+
+              <div class="int-test-action">
+                <button id="wazuh-test-btn" class="int-btn int-btn--primary" type="button" aria-label="Test Wazuh connection">
+                  <i data-lucide="wifi"></i>
+                  Test Connection
+                </button>
+              </div>
+            </div>
+
+            <!-- Test Result Banner (hidden by default) -->
+            <div id="wazuh-test-result" class="int-test-result" role="status" aria-live="polite" style="display:none;">
+              <div class="int-result-icon"><i data-lucide="loader-2"></i></div>
+              <div class="int-result-body">
+                <span class="int-result-title">Testing…</span>
+                <span class="int-result-detail"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- BOTTOM ACTION BAR -->
+          <div class="int-bottom-bar">
+            <div class="int-bottom-left">
+              <button id="wazuh-clear-btn" class="int-btn int-btn--outline-danger" type="button" aria-label="Clear saved Wazuh settings">
+                <i data-lucide="trash-2"></i>
+                Clear
+              </button>
+            </div>
+            <div class="int-bottom-right">
+              <button id="wazuh-cancel-btn" class="int-btn int-btn--neutral" type="button" aria-label="Cancel editing settings">Cancel</button>
+              <button id="wazuh-save-btn" class="int-btn int-btn--primary" type="button" aria-label="Save Wazuh integration settings">
+                <i data-lucide="save"></i>
+                Save Settings
+              </button>
+            </div>
+          </div>
+
+        </section><!-- /settings-integrations -->
+
+
+      </div><!-- /view-settings -->
+
+      <!-- ════════════════════════════════════════════
+           RULES MANAGEMENT VIEW
+      ════════════════════════════════════════════ -->
+      <div id="view-rules" class="view-rules-container" style="display: none;">
+
+        <!-- HEADER CARD -->
+        <div class="rules-header-card">
+          <div class="rules-title-group">
+            <h2 class="rules-title">
+              <i data-lucide="file-code-2"></i>
+              Wazuh Rules Manager
+            </h2>
+            <p class="rules-subtitle">Fetch, edit, and apply custom XML rule configurations to Wazuh Manager</p>
+          </div>
+
+          <div class="rules-controls-group">
+            <!-- New File Button -->
+            <button id="rule-new-btn" class="int-btn int-btn--neutral" type="button" title="Create new XML rule file">
+              <i data-lucide="file-plus"></i>
+              New File
+            </button>
+
+            <!-- Refresh Button -->
+            <button id="rule-refresh-btn" class="int-btn int-btn--neutral" type="button" title="Refresh XML rule files from server (GET /rules/files)">
+              <i data-lucide="refresh-cw"></i>
+            </button>
+
+            <!-- Restart Manager Button (Header - separate button with confirm dialog for downtime) -->
+            <button id="rule-restart-btn" class="int-btn int-btn--outline-danger" type="button" title="Restart Wazuh Manager (Requires confirmation due to service downtime)">
+              <i data-lucide="rotate-cw"></i>
+              Restart Manager
+            </button>
+
+            <!-- Save Rules Button (PUT) -->
+            <button id="rule-save-btn" class="int-btn int-btn--primary" type="button">
+              <i data-lucide="save"></i>
+              บันทึก Rules (PUT)
+            </button>
+          </div>
+        </div>
+
+        <!-- SPLIT 2-PANEL WORKSPACE -->
+        <div class="rules-workspace">
+
+          <!-- LEFT PANEL: FILE EXPLORER LIST -->
+          <aside class="rules-file-explorer" aria-label="Rule files Explorer">
+            <div class="rules-explorer-header">
+              <div class="rules-explorer-title-row">
+                <span class="rules-explorer-title">
+                  <i data-lucide="folder-code" style="width: 14px; height: 14px; color: var(--accent);"></i>
+                  Rule Files
+                </span>
+                <span id="rule-file-count" class="rules-file-count-badge">0 files</span>
+              </div>
+              <div class="rules-search-wrap">
+                <i data-lucide="search" class="rules-search-icon"></i>
+                <input id="rule-file-search" type="text" class="rules-search-input" placeholder="Filter rule files..." autocomplete="off" spellcheck="false" />
+              </div>
+            </div>
+
+            <!-- Scrollable File List -->
+            <div id="rule-file-list" class="rules-file-list">
+              <!-- Dynamically populated by RulesEditorController.fetchRuleFilesList() -->
+            </div>
+          </aside>
+
+          <!-- RIGHT PANEL: MONACO CODE EDITOR CARD -->
+          <div class="rule-editor-card">
+            <div class="rule-editor-toolbar">
+              <div class="rule-toolbar-left">
+                <span class="rules-file-badge">
+                  <i data-lucide="file-code" style="width: 12px; height: 12px; color: var(--accent);"></i>
+                  <span id="rule-current-filename">local_rules.xml</span>
+                </span>
+                <span id="rule-status-text" class="rule-status-tag">Ready</span>
+                <span class="rule-lang-badge">XML</span>
+              </div>
+              <div class="rule-toolbar-right">
+                <button id="rule-format-btn" class="rule-tool-btn" type="button" title="Format XML markup">
+                  <i data-lucide="align-left" style="width: 12px; height: 12px;"></i>
+                  Format XML
+                </button>
+                <button id="rule-copy-btn" class="rule-tool-btn" type="button" title="Copy XML content to clipboard">
+                  <i data-lucide="copy" style="width: 12px; height: 12px;"></i>
+                  Copy
+                </button>
+              </div>
+            </div>
+
+            <!-- Monaco / Fallback Editor Body -->
+            <div class="rule-editor-body">
+              <div id="rule-monaco-editor" class="rule-monaco-container"></div>
+            </div>
+
+            <div class="rule-editor-statusbar">
+              <span id="rule-editor-stats">Ln 1, Col 1  •  0 lines  •  0 chars</span>
+              <span class="rule-statusbar-right">
+                <span class="rule-kb-hint"><kbd>Ctrl</kbd> + <kbd>S</kbd> Save</span>
+                <span>UTF-8</span>
+              </span>
+            </div>
+          </div>
+
+        </div><!-- /rules-workspace -->
+
+      </div><!-- /view-rules -->
+
+      <!-- ════════════════════════════════════════════
+           SERVER CONSOLE / REMOTE TERMINAL VIEW
+      ════════════════════════════════════════════ -->
+      <div id="view-terminal" class="view-terminal-container" style="display: none;">
+
+        <!-- Header Card -->
+        <div class="rules-header-card">
+          <div class="rules-title-group">
+            <h2 class="rules-title">
+              <i data-lucide="terminal"></i>
+              Server Console
+            </h2>
+            <p class="rules-subtitle">Execute Linux commands directly on Wazuh Server (10.145.10.57) without opening PowerShell</p>
+          </div>
+
+          <div class="rules-controls-group">
+            <div style="display:flex; align-items:center; gap:var(--sp-2); padding: 4px 10px; background:var(--surface-2); border-radius:var(--radius-sm); border:1px solid var(--border-subtle); font-size:var(--fs-xs);">
+              <span style="width:8px; height:8px; border-radius:50%; background:var(--ok);"></span>
+              <span style="color:var(--text-mid); font-family:var(--font-mono);">tawaikiar_p@10.145.10.57</span>
+            </div>
+            <button id="term-clear-btn" class="int-btn int-btn--neutral" type="button" title="Clear terminal screen">
+              <i data-lucide="trash-2"></i>
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Actions Preset Toolbar -->
+        <div class="term-presets-bar">
+          <span class="term-presets-label"><i data-lucide="sparkles"></i> Quick Commands:</span>
+          <button class="term-preset-chip" data-cmd="sudo systemctl status wazuh-manager --no-pager" title="Check Wazuh Manager status">
+            <i data-lucide="activity"></i> Wazuh Status
+          </button>
+          <button class="term-preset-chip" data-cmd="sudo systemctl restart wazuh-manager" title="Restart Wazuh Manager">
+            <i data-lucide="refresh-cw"></i> Restart Manager
+          </button>
+          <button class="term-preset-chip" data-cmd="sudo /var/ossec/bin/agent_control -l" title="List all connected agents">
+            <i data-lucide="users"></i> Active Agents
+          </button>
+          <button class="term-preset-chip" data-cmd="fuser -k 3000/tcp 2>/dev/null || true; echo Port 3000 cleared" title="Free up port 3000">
+            <i data-lucide="cable"></i> Clear Port 3000
+          </button>
+          <button class="term-preset-chip" data-cmd="sudo tail -n 25 /var/ossec/logs/ossec.log" title="View last 25 lines of ossec.log">
+            <i data-lucide="file-text"></i> System Log
+          </button>
+          <button class="term-preset-chip" data-cmd="sudo tail -n 10 /var/ossec/logs/alerts/alerts.json" title="View last 10 raw alerts">
+            <i data-lucide="shield-alert"></i> Raw Alerts Log
+          </button>
+          <button class="term-preset-chip" data-cmd="uptime; free -m; df -h /" title="Check server resource usage">
+            <i data-lucide="cpu"></i> System Health
+          </button>
+        </div>
+
+        <!-- Terminal Window Frame -->
+        <div class="terminal-window">
+          <div class="terminal-titlebar">
+            <div class="terminal-dots">
+              <span class="term-dot term-dot--red"></span>
+              <span class="term-dot term-dot--yellow"></span>
+              <span class="term-dot term-dot--green"></span>
+            </div>
+            <div class="terminal-tab-title">
+              <i data-lucide="terminal" style="width:12px;height:12px;"></i>
+              bash — tawaikiar_p@wazuh-server
+            </div>
+            <button id="term-root-toggle" class="term-preset-chip" style="margin-left:auto; padding:3px 10px; font-size:11px; border-color:var(--border-subtle);" type="button" title="Toggle Root / Sudo Mode">
+              <i data-lucide="shield"></i> Root Mode: OFF
+            </button>
+          </div>
+
+          <!-- Output Screen -->
+          <div id="terminal-screen" class="terminal-screen" role="log" aria-live="polite">
+            <div class="term-line term-line--system">
+              [Aegis SOC Web Terminal v1.0] Connected to tawaikiar_p@10.145.10.57 via SSH Key.
+            </div>
+            <div class="term-line term-line--hint">
+              Type any Linux / Wazuh command below or click a Quick Command preset above. Press Enter to execute. Type <code>sudo -i</code> to enter Root Mode.
+            </div>
+          </div>
+
+          <!-- Input Bar -->
+          <form id="terminal-form" class="terminal-input-bar">
+            <span id="term-prompt-label" class="term-prompt">tawaikiar_p@wazuh:~$</span>
+            <input
+              type="text"
+              id="terminal-input"
+              class="term-input"
+              placeholder="Enter command (e.g. sudo systemctl status wazuh-manager, sudo -i, ls -la /var/ossec)..."
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button id="term-run-btn" class="int-btn int-btn--primary term-run-btn" type="submit" aria-label="Execute command">
+              <i data-lucide="corner-down-left"></i>
+              Run
+            </button>
+          </form>
+        </div>
+
+      </div><!-- /view-terminal -->
+
+    </main><!-- /main-content -->
+  </div><!-- /main-wrapper -->
+</div><!-- /app -->
+
+<!-- ── Toast Container ──────────────────────────────────── -->
+<div id="toast-container" aria-live="polite" aria-label="Notifications"></div>
+
+<!-- ── Restart Manager Popup Modal ────────────────────── -->
+<div id="restart-modal" class="restart-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="restart-modal-dialog">
+    <div class="restart-modal-header">
+      <div id="modal-title" class="restart-modal-title">
+        <i data-lucide="alert-triangle"></i>
+        ยืนยันการ Restart Wazuh Manager
+      </div>
+      <button id="modal-close-btn" class="restart-modal-close" type="button" aria-label="Close modal">✕</button>
+    </div>
+    <div class="restart-modal-body">
+      <p style="margin: 0; font-weight: 500; color: var(--text-hi);">
+        คุณต้องการสั่ง Restart Wazuh Manager เพื่อให้กฎใหม่มีผลใช้งานหรือไม่?
+      </p>
+      <div class="restart-modal-info-box">
+        <i data-lucide="alert-octagon" style="width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px; color: var(--crit);"></i>
+        <div>
+          <strong>ข้อควรระวังเรื่อง Downtime:</strong><br/>
+          การกด Restart จะทำให้ Wazuh Manager หยุดทำงานชั่วคราว (ประมาณ 10–30 วินาที) ในระหว่างนี้ระบบจะไม่สามารถประมวลผล Alert หรือ Rule ใหม่ได้ชั่วขณะ
+        </div>
+      </div>
+    </div>
+    <div class="restart-modal-footer">
+      <button id="modal-later-btn" class="int-btn int-btn--neutral" type="button">
+        ไว้ทีหลัง (Cancel)
+      </button>
+      <button id="modal-restart-btn" class="int-btn int-btn--outline-danger" type="button" style="background: rgba(244, 87, 106, 0.15); border-color: var(--crit);">
+        <i data-lucide="refresh-cw"></i>
+        ยืนยัน Restart Manager ตอนนี้
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Scripts ──────────────────────────────────────────── -->
+<script src="js/wazuh.js"></script>
+<script src="js/panels.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/topbar.js"></script>
+<script src="js/integrations.js"></script>
+<script src="js/rules-editor.js"></script>
+
+<script src="js/terminal.js"></script>
+<script src="js/receiver.js"></script>
+<script src="js/time-range.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
+

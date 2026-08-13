@@ -1,0 +1,229 @@
+/* ============================================================
+   AEGIS SOC — Panel & KPI State Styles
+   ============================================================ */
+
+/* ══════════════════════════════════════════════════════════
+   LOADING STATE
+══════════════════════════════════════════════════════════ */
+.panel-state {
+  display: none;
+  flex-direction: column;
+}
+
+.panel-state.active {
+  display: flex;
+  flex: 1;
+}
+
+/* Skeleton loading body */
+.state-loading {
+  padding: var(--sp-2) 0;
+}
+
+/* ══════════════════════════════════════════════════════════
+   EMPTY STATE
+══════════════════════════════════════════════════════════ */
+.state-empty {
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-8) var(--sp-6);
+  gap: var(--sp-3);
+  text-align: center;
+}
+
+.empty-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.empty-icon--ok     { background: var(--ok-dim);    color: var(--ok); }
+.empty-icon--accent { background: var(--accent-dim); color: var(--accent); }
+.empty-icon svg { width: 20px; height: 20px; }
+
+.empty-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-mid);
+}
+
+.empty-sub {
+  font-size: var(--fs-xs);
+  color: var(--text-lo);
+  max-width: 220px;
+  line-height: 1.5;
+}
+
+/* ══════════════════════════════════════════════════════════
+   ERROR STATE
+══════════════════════════════════════════════════════════ */
+.state-error {
+  padding: var(--sp-4) var(--sp-5);
+}
+
+.error-box {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  background: var(--crit-dim);
+  border: 1px solid var(--border-crit);
+  border-radius: var(--radius-sm);
+}
+
+.error-box-icon {
+  flex-shrink: 0;
+  color: var(--crit);
+  margin-top: 1px;
+}
+.error-box-icon svg { width: 15px; height: 15px; }
+
+.error-box-content { flex: 1; }
+.error-box-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--crit);
+  margin-bottom: 2px;
+}
+.error-box-body {
+  font-size: var(--fs-xs);
+  color: var(--text-mid);
+  line-height: 1.4;
+}
+
+.error-retry-btn {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 5px 12px;
+  background: var(--crit-dim);
+  border: 1px solid var(--border-crit);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--crit);
+  cursor: pointer;
+  transition: background var(--t-fast);
+}
+.error-retry-btn:hover { background: rgba(244, 87, 106, 0.20); }
+.error-retry-btn svg { width: 11px; height: 11px; }
+
+/* ══════════════════════════════════════════════════════════
+   DATA STATE (populated)
+══════════════════════════════════════════════════════════ */
+.state-data {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-default) transparent;
+}
+.state-data::-webkit-scrollbar { width: 4px; }
+.state-data::-webkit-scrollbar-track { background: transparent; }
+.state-data::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 2px;
+}
+.state-data::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* ══════════════════════════════════════════════════════════
+   KPI CARD STATES
+══════════════════════════════════════════════════════════ */
+
+/* Loading: skeleton over number and delta */
+.kpi-card[data-state="loading"] .kpi-value { display: none; }
+.kpi-card[data-state="loading"] .kpi-delta { display: none; }
+.kpi-card[data-state="loading"] .kpi-skel-value { display: block; }
+.kpi-card[data-state="loading"] .kpi-skel-delta { display: block; }
+
+/* Empty: show dimmed "—" placeholder */
+.kpi-card[data-state="empty"] .kpi-value {
+  color: var(--text-lo);
+}
+.kpi-card[data-state="empty"] .kpi-delta {
+  color: var(--text-lo);
+}
+.kpi-card[data-state="empty"] .kpi-skel-value { display: none; }
+.kpi-card[data-state="empty"] .kpi-skel-delta { display: none; }
+
+/* Error: red tint + message */
+.kpi-card[data-state="error"] {
+  border-color: var(--border-crit);
+  background: rgba(244, 87, 106, 0.04);
+}
+.kpi-card[data-state="error"] .kpi-value { color: var(--crit); }
+.kpi-card[data-state="error"] .kpi-delta { color: var(--crit); }
+.kpi-card[data-state="error"] .kpi-skel-value { display: none; }
+.kpi-card[data-state="error"] .kpi-skel-delta { display: none; }
+
+/* Data: normal display */
+.kpi-card[data-state="data"] .kpi-skel-value { display: none; }
+.kpi-card[data-state="data"] .kpi-skel-delta { display: none; }
+
+/* Hidden by default — shown via display:block when visible */
+.kpi-skel-value,
+.kpi-skel-delta { display: none; }
+
+/* ══════════════════════════════════════════════════════════
+   WEBHOOK-DRIVEN ROW ELEMENTS
+   Used by PanelManager row renderers (ingestAlerts)
+══════════════════════════════════════════════════════════ */
+
+/* Severity dot — maps crit/warn/ok to existing colour tokens */
+.row-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.row-dot--crit { background: var(--crit); box-shadow: 0 0 5px var(--crit-glow); }
+.row-dot--warn { background: var(--warn); box-shadow: 0 0 5px var(--warn-glow); }
+.row-dot--ok   { background: var(--ok);   box-shadow: 0 0 4px var(--ok-glow); }
+
+/* Row body — wraps title + sub, same as .row-content */
+.row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Level chip — monospace badge e.g. "L12" */
+.row-chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0.03em;
+}
+.row-chip--crit {
+  background: var(--crit-dim);
+  color: var(--crit);
+  border: 1px solid rgba(244, 87, 106, 0.25);
+}
+.row-chip--warn {
+  background: var(--warn-dim);
+  color: var(--warn);
+  border: 1px solid rgba(245, 185, 77, 0.25);
+}
+.row-chip--ok {
+  background: var(--ok-dim);
+  color: var(--ok);
+  border: 1px solid rgba(45, 212, 167, 0.25);
+}
+
+/* Row enter animation — only plays on NEW rows tagged with --new */
+@keyframes row-enter {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.data-row--new {
+  animation: row-enter 0.22s ease both;
+}
+

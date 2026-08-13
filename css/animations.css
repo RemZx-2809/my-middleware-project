@@ -1,0 +1,127 @@
+/* ============================================================
+   AEGIS SOC — Animations & Keyframes
+   ============================================================ */
+
+/* ── Shimmer (skeleton loading) ─────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.03) 0%,
+    rgba(34, 211, 238, 0.07) 40%,
+    rgba(255,255,255,0.03) 80%
+  );
+  background-size: 600px 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Pulse dot (connection/sensor alive indicator) ───────── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.75); }
+}
+
+.pulse-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+.pulse-dot--ok   { background: var(--ok);   box-shadow: 0 0 6px var(--ok-glow); }
+.pulse-dot--warn { background: var(--warn); box-shadow: 0 0 6px var(--warn-glow); }
+.pulse-dot--crit { background: var(--crit); box-shadow: 0 0 6px var(--crit-glow); }
+.pulse-dot--dim  { background: var(--text-lo); animation: none; }
+
+/* ── Radar ring spin (brand logo) ────────────────────────── */
+@keyframes radar-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.radar-ring {
+  animation: radar-spin 4s linear infinite;
+  transform-origin: center;
+}
+
+/* ── Radar sweep (brand logo inner) ─────────────────────── */
+@keyframes radar-sweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Glow pulse (active elements) ───────────────────────── */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 6px var(--accent-glow); }
+  50%       { box-shadow: 0 0 18px var(--accent-glow), 0 0 32px var(--accent-glow-lg); }
+}
+
+.glow-pulse {
+  animation: glow-pulse 2.5s ease-in-out infinite;
+}
+
+/* ── Fade in up (panels, cards on load) ──────────────────── */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in-up {
+  animation: fade-in-up 0.35s ease both;
+}
+
+/* ── Slide in from right (toast) ─────────────────────────── */
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(120%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-out-right {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(120%); }
+}
+
+.toast-enter { animation: slide-in-right 0.30s cubic-bezier(0.2, 0, 0, 1) both; }
+.toast-leave { animation: slide-out-right 0.25s ease-in both; }
+
+/* ── Progress bar fill ───────────────────────────────────── */
+@keyframes progress-fill {
+  from { width: 0%; }
+  to   { width: var(--target-w, 0%); }
+}
+
+/* ── Float (decorative glows on background) ─────────────── */
+@keyframes float-glow {
+  0%, 100% { opacity: 0.06; transform: scale(1); }
+  50%       { opacity: 0.10; transform: scale(1.08); }
+}
+
+/* ── Blink cursor (mono labels) ─────────────────────────── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* ── Spin (refresh icon) ─────────────────────────────────── */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.spinning { animation: spin 0.8s linear infinite; }
+
+/* ── Scale in (dropdown) ─────────────────────────────────── */
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.92) translateY(-6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes scale-out {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to   { opacity: 0; transform: scale(0.92) translateY(-6px); }
+}

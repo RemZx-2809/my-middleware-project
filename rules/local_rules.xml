@@ -1,0 +1,5 @@
+<group name="custom_rules">
+  <rule id="100001" level="5">
+    <description>Custom local security rule</description>
+  </rule>
+</group>

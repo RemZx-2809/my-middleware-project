@@ -1,0 +1,6 @@
+{
+  "webhookSecret": "",
+  "sshAutoTunnel": true,
+  "sshHost": "10.145.10.57",
+  "sshUser": "tawaikiar_p"
+}
