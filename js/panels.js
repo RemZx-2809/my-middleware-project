@@ -71,14 +71,37 @@ const PanelManager = (() => {
     return panels[id]?.currentState ?? null;
   }
 
-  /* ── KPI Card State Machine ────────────────────────────── */
+  /* ── KPI Card State Machine & Selection ─────────────────── */
   const kpiCards = {};
+  let _activeKpiUseCase = null;
 
   function registerKpi(id) {
     const el = document.getElementById(id);
     if (!el) { console.warn(`[PanelManager] KPI #${id} not found.`); return; }
     kpiCards[id] = { el, currentState: 'loading' };
     _applyKpiState(id, 'loading');
+  }
+
+  function _applyKpiPanelFilter() {
+    const allPanelIds = [
+      'panel-critical-alerts',
+      'panel-file-changes',
+      'panel-blind-spots',
+      'panel-auth-anomalies',
+      'panel-threat-intel',
+    ];
+
+    allPanelIds.forEach(pId => {
+      const pEl = document.getElementById(pId);
+      if (pEl) {
+        pEl.style.display = '';
+        pEl.classList.remove('panel--highlighted');
+      }
+    });
+
+    document.querySelectorAll('.panel-col').forEach(col => {
+      col.style.display = '';
+    });
   }
 
   function setKpiState(id, state, value, deltaText, deltaDir) {
@@ -155,6 +178,7 @@ const PanelManager = (() => {
       rowsId:  'blind-spots-rows',
       renderer: _renderBlindSpotAlert,
       kpiDir:  'up',
+      kpiMode: 'devices',  // show unique device names count
     },
     critical_file_changes: {
       panelId: 'panel-file-changes',
@@ -179,6 +203,9 @@ const PanelManager = (() => {
     },
   };
 
+  const _storedAlertsByUseCase = {};
+  let _activeFilterFn = null;
+
   /**
    * Ingest a batch of alerts for a use case and render them.
    * Called by receiver.js with the top-N alerts from the server store.
@@ -193,63 +220,114 @@ const PanelManager = (() => {
       return;
     }
 
+    if (replace || !_storedAlertsByUseCase[useCase]) {
+      _storedAlertsByUseCase[useCase] = [...alerts];
+    } else {
+      _storedAlertsByUseCase[useCase] = [...alerts, ..._storedAlertsByUseCase[useCase]];
+    }
+
+    const currentAlerts = _activeFilterFn 
+      ? _storedAlertsByUseCase[useCase].filter(_activeFilterFn)
+      : _storedAlertsByUseCase[useCase];
+
+    _renderPanelAlerts(useCase, currentAlerts, replace);
+  }
+
+  function _renderPanelAlerts(useCase, alerts = [], replace = true) {
+    const mapping = USE_CASE_MAP[useCase];
+    if (!mapping) return;
+
     const container = document.getElementById(mapping.rowsId);
     if (!container) return;
 
     if (!alerts || alerts.length === 0) {
-      if (replace) {
-        container.innerHTML = '';
-        setState(mapping.panelId, 'empty');
+      container.innerHTML = '';
+      setState(mapping.panelId, 'empty');
+      if (mapping.kpiMode === 'devices') {
+        _updateKpiDevices(mapping.kpiId, 0, mapping.kpiDir);
+      } else {
         _updateKpi(mapping.kpiId, 0, mapping.kpiDir);
-        const panel = document.getElementById(mapping.panelId);
-        const badge = panel?.querySelector('.panel-count-badge');
-        if (badge) badge.textContent = '0';
       }
+      const panel = document.getElementById(mapping.panelId);
+      const badge = panel?.querySelector('.panel-count-badge');
+      if (badge) badge.textContent = '0';
       return;
     }
 
-    if (replace || container.children.length === 0) {
-      // Full replace: snapshot on load or sync-done — insert with no animation
-      container.innerHTML = alerts.map(mapping.renderer).join('');
-    } else {
-      // Incremental: single new alert via live webhook — prepend and animate ONLY new rows
-      const newHtml = alerts.map(mapping.renderer).join('');
-      const tmp = document.createElement('div');
-      tmp.innerHTML = newHtml;
+    // Sort by severity desc then timestamp desc
+    const sorted = [...alerts].sort((a, b) => {
+      const lvA = parseInt(a?.rule?.level ?? 0, 10);
+      const lvB = parseInt(b?.rule?.level ?? 0, 10);
+      if (lvB !== lvA) return lvB - lvA;
+      const tsA = new Date(a.timestamp || a.receivedAt || a['@timestamp'] || 0).getTime();
+      const tsB = new Date(b.timestamp || b.receivedAt || b['@timestamp'] || 0).getTime();
+      return tsB - tsA;
+    });
 
-      // Tag new rows before inserting so only they animate
-      Array.from(tmp.children).forEach(row => {
-        row.classList.add('data-row--new');
-        // Auto-remove animation class after it finishes so it never re-plays
-        row.addEventListener('animationend', () => row.classList.remove('data-row--new'), { once: true });
-      });
-
-      while (tmp.lastChild) {
-        container.insertBefore(tmp.lastChild, container.firstChild);
-      }
-    }
-
-    // Transition panel to data state
+    container.innerHTML = sorted.map(mapping.renderer).join('');
     setState(mapping.panelId, 'data');
 
-    // Update KPI + badge with actual row count
     const rowCount = container.children.length;
-    _updateKpi(mapping.kpiId, rowCount, mapping.kpiDir);
-
     const panel = document.getElementById(mapping.panelId);
     const badge = panel?.querySelector('.panel-count-badge');
-    if (badge) badge.textContent = rowCount;
+
+    // For blind_spots: KPI and badge show unique device names count
+    if (mapping.kpiMode === 'devices') {
+      const uniqueDevices = new Set(
+        alerts.map(a => a.agent?.name ?? 'unknown').filter(Boolean)
+      );
+      _updateKpiDevices(mapping.kpiId, uniqueDevices.size, mapping.kpiDir);
+      if (badge) badge.textContent = uniqueDevices.size;
+    } else {
+      _updateKpi(mapping.kpiId, rowCount, mapping.kpiDir);
+      if (badge) badge.textContent = rowCount;
+    }
+  }
+
+  function setFilter(filterFn) {
+    _activeFilterFn = filterFn;
+    reRenderAllPanels();
+  }
+
+  function clearFilter() {
+    _activeFilterFn = null;
+    reRenderAllPanels();
+  }
+
+  function reRenderAllPanels() {
+    Object.keys(USE_CASE_MAP).forEach(useCase => {
+      const allForCase = _storedAlertsByUseCase[useCase] || [];
+      const current = _activeFilterFn ? allForCase.filter(_activeFilterFn) : allForCase;
+      _renderPanelAlerts(useCase, current, true);
+    });
   }
 
   /**
-   * Update a KPI card to show a count.
+   * Update a KPI card to show an event count.
    */
   function _updateKpi(kpiId, count, dir) {
+    let sub = `${count} event${count !== 1 ? 's' : ''} received`;
+    if (kpiId === 'kpi-file-changes') {
+      sub = `${count} resolved fix${count !== 1 ? 'es' : ''} total`;
+    }
     setKpiState(
       kpiId,
       'data',
       String(count),
-      `${count} event${count !== 1 ? 's' : ''} received`,
+      sub,
+      dir ?? 'up',
+    );
+  }
+
+  /**
+   * Update a KPI card to show unique device names count.
+   */
+  function _updateKpiDevices(kpiId, count, dir) {
+    setKpiState(
+      kpiId,
+      'data',
+      String(count),
+      `${count} device${count !== 1 ? 's' : ''} detected`,
       dir ?? 'up',
     );
   }
@@ -333,16 +411,17 @@ const PanelManager = (() => {
 </div>`;
   }
 
-  /* USE CASE 3: Critical File & System Changes */
+  /* USE CASE 3: Redmine Resolved Fixes & File Changes */
   function _renderFileChangeAlert(alert) {
+    const isFix  = alert.action === 'redmine_fix_synced' || !alert.rule?.level;
     const level  = alert.rule?.level ?? 0;
-    const cls    = _levelClass(level);
-    const desc   = _esc(alert.rule?.description ?? 'FIM event');
-    const fpath  = _esc(alert.syscheck?.path ?? alert.data?.path ?? '');
-    const event  = _esc(alert.syscheck?.event ?? '');
-    const agent  = _esc(alert.agent?.name ?? '');
-    const sub    = [fpath || event, agent].filter(Boolean).join(' · ');
-    const time   = _relTime(alert.timestamp ?? alert.receivedAt);
+    const cls    = isFix ? 'ok' : _levelClass(level);
+    const desc   = _esc(alert.subject || alert.rule?.description || alert.filename || 'Resolved fix');
+    const fpath  = _esc(alert.filename || alert.syscheck?.path || alert.data?.path || '');
+    const user   = _esc(alert.user || alert.author?.name || alert.agent?.name || 'Redmine');
+    const sub    = [fpath, user].filter(Boolean).join(' · ');
+    const time   = _relTime(alert.timestamp ?? alert.receivedAt ?? alert.updated_on);
+    const chipText = isFix ? 'FIXED' : `L${level}`;
 
     return `<div class="data-row">
   <div class="row-dot row-dot--${cls}"></div>
@@ -350,7 +429,7 @@ const PanelManager = (() => {
     <span class="row-title">${desc}</span>
     <span class="row-sub">${sub}</span>
   </div>
-  <span class="row-chip row-chip--${cls}">L${level}</span>
+  <span class="row-chip row-chip--${cls}">${chipText}</span>
   <span class="row-time">${time}</span>
 </div>`;
   }
@@ -407,6 +486,9 @@ const PanelManager = (() => {
     setKpiState,
     attachWazuhListeners,
     ingestAlerts,
+    setFilter,
+    clearFilter,
+    reRenderAllPanels,
   };
 })();
 

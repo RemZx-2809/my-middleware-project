@@ -263,6 +263,24 @@ const IntegrationsController = (() => {
       _showResult('success', 'Connection Successful', `Authenticated successfully · ${url}`);
       _setBadge('connected');
 
+      // Persist connected state immediately so F5 preserves connection
+      try {
+        let savedCfg = {};
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) savedCfg = JSON.parse(raw);
+        savedCfg.baseUrl = url;
+        savedCfg.authMode = _authMode;
+        savedCfg.username = creds.username || '';
+        if (creds.password) savedCfg.password = creds.password;
+        savedCfg.token = token || '';
+        savedCfg.isConnected = true;
+        savedCfg.sslVerify = _el.sslVerify?.checked ?? true;
+        savedCfg.savedAt = Date.now();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedCfg));
+      } catch (e) {
+        console.warn('[IntegrationsController] Could not persist state:', e);
+      }
+
       WazuhClient.configure(url, token);
       if (typeof WazuhClient.setState === 'function') {
         WazuhClient.setState(WazuhClient.STATES.CONNECTED);
@@ -326,10 +344,12 @@ const IntegrationsController = (() => {
       baseUrl:       url,
       authMode:      _authMode,
       username:      _el.username?.value.trim() ?? '',
+      password:      _el.password?.value ?? '',
       hasPassword:   !!_el.password?.value,
       token:         _authMode === 'token' ? (_el.jwtToken?.value.trim() ?? '') : '',
       sslVerify:     _el.sslVerify?.checked ?? true,
       webhookSecret: _el.webhookSecret?.value.trim() ?? '',
+      isConnected:   true,
       savedAt:       Date.now(),
     };
 
@@ -357,6 +377,11 @@ const IntegrationsController = (() => {
 
     const activeToken = _authMode === 'token' ? (_el.jwtToken?.value.trim() || null) : null;
     WazuhClient.configure(url, activeToken);
+    if (typeof WazuhClient.setState === 'function') {
+      WazuhClient.setState(WazuhClient.STATES.CONNECTED);
+    } else {
+      _dispatchWazuhState('connected');
+    }
 
     Toast.show({
       type:  'ok',
@@ -674,8 +699,22 @@ const IntegrationsController = (() => {
       _el.webhookSecret.value = config.webhookSecret;
     }
 
-    if (config.hasPassword && _el.password) {
+    if (config.password && _el.password) {
+      _el.password.value = config.password;
+    } else if (config.hasPassword && _el.password) {
       _el.password.placeholder = '(previously saved — re-enter to update)';
+    }
+
+    // Auto-restore connected state if config was previously saved/verified
+    if (config.isConnected !== false && (config.savedAt || config.baseUrl)) {
+      _testPassed = true;
+      _setBadge('connected');
+      WazuhClient.configure(config.baseUrl, config.token || null);
+      if (typeof WazuhClient.setState === 'function') {
+        WazuhClient.setState(WazuhClient.STATES.CONNECTED);
+      } else {
+        _dispatchWazuhState('connected');
+      }
     }
   }
 

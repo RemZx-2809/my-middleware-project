@@ -13,18 +13,7 @@
 
 
 document.addEventListener('DOMContentLoaded', () => {
-  /* ── Initialize Controllers ────────────────────────────── */
-  SidebarController.init();
-  TopbarController.init();
-  PanelManager.attachWazuhListeners();
-  IntegrationsController.init();
-  if (window.RulesEditorController) RulesEditorController.init();
-  if (window.SshAuthController)     SshAuthController.init();
-  if (window.TerminalController)    TerminalController.init();
-  WebhookReceiver.init();      // connects SSE, populates panels from push data
-  if (window.TimeRangePicker) TimeRangePicker.init(); // time range picker (also does initial data fetch)
-
-  /* ── Register KPI Cards ────────────────────────────────── */
+  /* ── 1. Register KPI Cards FIRST ────────────────────────── */
   [
     'kpi-critical-alerts',
     'kpi-blind-spots',
@@ -32,6 +21,33 @@ document.addEventListener('DOMContentLoaded', () => {
     'kpi-access-anomalies',
     'kpi-threat-intel',
   ].forEach(id => PanelManager.registerKpi(id));
+
+  /* ── 2. Register Panels FIRST ──────────────────────────── */
+  [
+    'panel-critical-alerts',
+    'panel-file-changes',
+    'panel-blind-spots',
+    'panel-auth-anomalies',
+    'panel-threat-intel',
+  ].forEach(id => PanelManager.register(id));
+
+  /* ── 3. Initialize Controllers ──────────────────────────── */
+  SidebarController.init();
+  TopbarController.init();
+  PanelManager.attachWazuhListeners();
+  IntegrationsController.init();
+  if (window.RulesEditorController) RulesEditorController.init();
+  if (window.SshAuthController)     SshAuthController.init();
+  if (window.TerminalController)    TerminalController.init();
+  if (window.TopChartsController)   TopChartsController.init();
+  if (window.DiscoverController)    DiscoverController.init();
+  if (window.DbStorageController)   DbStorageController.init();
+  if (window.FileHistoryController)  FileHistoryController.init();
+  if (window.RedmineController)      RedmineController.init();
+
+  /* ── 4. Connect Webhook & Time Range Picker ────────────── */
+  WebhookReceiver.init();      // connects SSE, populates panels from push data
+  if (window.TimeRangePicker) TimeRangePicker.init(); // time range picker (also does initial data fetch)
 
   // KPI cards: start loading, move to empty after delay unless receiver
   // has already populated them with real Wazuh push data.
@@ -51,15 +67,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }, 1400);
-
-  /* ── Register Panels ───────────────────────────────────── */
-  [
-    'panel-critical-alerts',
-    'panel-file-changes',
-    'panel-blind-spots',
-    'panel-auth-anomalies',
-    'panel-threat-intel',
-  ].forEach(id => PanelManager.register(id));
 
   // Panels: start loading → move to empty after delay unless receiver
   // has already populated them with real Wazuh push data.

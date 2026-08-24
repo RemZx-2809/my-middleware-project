@@ -7,6 +7,7 @@
 ════════════════════════════════════════════════════════════ */
 
 const http         = require('http');
+const https        = require('https');
 const fs           = require('fs');
 const path         = require('path');
 
@@ -18,6 +19,7 @@ const RULES_DIR   = path.join(__dirname, 'rules');
 if (!fs.existsSync(RULES_DIR)) fs.mkdirSync(RULES_DIR, { recursive: true });
 
 const { logAudit, getAuditLogs, clearAuditLogs } = require('./services/auditLog');
+const { testConnection: testRedmineConnection, createIssueFromAlert: createRedmineIssue, syncResolvedIssues: syncRedmineIssues, shouldTriggerTicket } = require('./services/redmine');
 
 /* ════════════════════════════════════════════════════════════
    SECURITY — rate limiter
@@ -54,7 +56,23 @@ function denyAdminIp(res, ip) {
 }
 
 /* ── Load persisted config ─────────────────────────────── */
-let _config = { webhookSecret: '', caPath: '' };
+let _config = {
+  webhookSecret: '',
+  caPath: '',
+  redmineUrl: '',
+  redmineApiKey: '',
+  redmineProject: '',
+  redmineTrackerId: '1',
+  redmineTriggerMode: 'min_level',  // 'min_level' | 'custom_rules' | 'all'
+  redmineMinLevel: '7',
+  redmineCustomRules: '',          // comma-separated Rule IDs (e.g. 81628, 5710, 550)
+  redmineDedupHours: '24',         // deduplication window in hours (0 = disable)
+  redmineAutoTicket: true,
+};
+let _tunnelState = {
+  running: false,
+  startedAt: null,
+};
 function _loadConfig() {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
@@ -96,6 +114,7 @@ const store = {
   threat_intel_matches:     [],
 };
 
+let _hasLoggedInitialStoreLoad = false;
 function _loadStore() {
   try {
     if (fs.existsSync(STORE_FILE)) {
@@ -110,7 +129,10 @@ function _loadStore() {
           return level >= 7;
         });
       }
-      console.log('[AEGIS] Loaded persisted alert store from disk');
+      if (!_hasLoggedInitialStoreLoad) {
+        console.log('[AEGIS] Loaded persisted alert store from disk');
+        _hasLoggedInitialStoreLoad = true;
+      }
     }
   } catch (e) {
     console.warn('[AEGIS] Could not read aegis.store.json:', e.message);
@@ -140,13 +162,34 @@ _loadStore();
 function classifyUseCase(alert) {
   const groups = alert?.rule?.groups || [];
   const g = Array.isArray(groups) ? groups.join(' ').toLowerCase() : String(groups).toLowerCase();
+  const desc = String(alert?.rule?.description || '').toLowerCase();
   const level = parseInt(alert?.rule?.level ?? 0, 10);
 
-  if (/syscheck|fim|file_integrity|ossec_integrity/.test(g)) return 'critical_file_changes';
-  if (/authentication|sshd|pam|login|web|win_authentication|invalid_login|brute_force/.test(g)) return 'auth_access_anomalies';
-  if (/agent_disconnected|ossec|keepalive|netstat|agent|agentless|ports_status/.test(g)) return 'blind_spots_agent_health';
-  if (/threat|malware|virus|yara|rootkit|trojan|ids|exploit|injection|worm/.test(g)) return 'threat_intel_matches';
-  if (level >= 7) return 'critical_alerts';
+  // 1. File Integrity / Syscheck
+  if (/syscheck|fim|file_integrity|ossec_integrity|file_monitor|inotify/.test(g) || /file added|file modified|file deleted|integrity checksum/.test(desc)) {
+    return 'critical_file_changes';
+  }
+
+  // 2. Authentication & Access Anomalies
+  if (/authentication|sshd|pam|login|web|win_authentication|invalid_login|brute_force|logon|rdp|ftp_auth/.test(g) || /failed login|authentication failed|invalid user|password/.test(desc)) {
+    return 'auth_access_anomalies';
+  }
+
+  // 3. Threat Intel / Malware / Attacks
+  if (/threat|malware|virus|yara|rootkit|trojan|ids|exploit|injection|worm|ransomware|c2|virustotal|suricata|snort/.test(g) || /attack|exploit|malware|threat|sqli|xss/.test(desc)) {
+    return 'threat_intel_matches';
+  }
+
+  // 4. Blind Spots & Agent Health (Only specific agent disconnect / keepalive / health events)
+  if (/agent_disconnected|agent_health|keepalive|agentless/.test(g) || /agent disconnected|agent stopped|agent not responding|keepalive/.test(desc)) {
+    return 'blind_spots_agent_health';
+  }
+
+  // 5. Critical Alerts — High severity alerts or ports/network/system events (level >= 7)
+  if (level >= 7) {
+    return 'critical_alerts';
+  }
+
   return null; // discard low-severity misc alerts
 }
 
@@ -155,6 +198,14 @@ function storeAlert(alert) {
   if (!VALID_USE_CASES.has(useCase)) return false;
   store[useCase].unshift(alert);
   _saveStore();
+
+  // Auto-create Redmine Issue if enabled and alert matches condition (with deduplication)
+  if (!alert._backfilled && shouldTriggerTicket(alert, _config)) {
+    createRedmineIssue(alert, _config).catch(err => {
+      console.warn('[Redmine] Auto-ticketing error:', err.message);
+    });
+  }
+
   return true;
 }
 
@@ -340,6 +391,7 @@ const server = http.createServer(async (req, res) => {
      GET /api/dashboard-data[?from=ISO&to=ISO]
   ══════════════════════════════════════════════════════════ */
   if (pathname === '/api/dashboard-data' && method === 'GET') {
+    _loadStore(); // always reload from disk to reflect latest changes
     const fromParam = url.searchParams.get('from');
     const toParam   = url.searchParams.get('to');
     const fromMs = fromParam ? new Date(fromParam).getTime() : null;
@@ -375,6 +427,77 @@ const server = http.createServer(async (req, res) => {
     logAudit({ user: req.headers['x-aegis-user'] || 'browser', action: 'data_cleared', before: 'had data', after: 'empty' }).catch(() => {});
     console.log('[AEGIS] All alert data cleared');
     return json(res, 200, { ok: true, message: 'All alert data cleared' });
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     GET /api/db-stats — middleware database size & health info
+  ══════════════════════════════════════════════════════════ */
+  if (pathname === '/api/db-stats' && method === 'GET') {
+    _loadStore();
+    const getFileStat = (filePath) => {
+      try {
+        if (fs.existsSync(filePath)) {
+          const s = fs.statSync(filePath);
+          return { size: s.size, mtime: s.mtime.toISOString(), exists: true };
+        }
+      } catch (_) {}
+      return { size: 0, mtime: null, exists: false };
+    };
+
+    const storeStat   = getFileStat(STORE_FILE);
+    const configStat  = getFileStat(CONFIG_FILE);
+    const auditStat   = getFileStat(path.join(__dirname, 'audit.log.ndjson'));
+    const serverLog   = getFileStat(path.join(__dirname, 'server.log'));
+    const serverErr   = getFileStat(path.join(__dirname, 'server.err'));
+
+    // Per-category record counts + estimated byte size
+    const categories = {};
+    let totalRecords = 0;
+    for (const [k, v] of Object.entries(store)) {
+      const byteEst = Buffer.byteLength(JSON.stringify(v), 'utf8');
+      categories[k] = { count: v.length, estimatedBytes: byteEst };
+      totalRecords += v.length;
+    }
+
+    // Oldest & newest alert timestamp
+    let oldestTs = null, newestTs = null;
+    for (const v of Object.values(store)) {
+      for (const a of v) {
+        const ts = a.timestamp || a.receivedAt || a['@timestamp'];
+        if (!ts) continue;
+        const t = new Date(ts).getTime();
+        if (isNaN(t)) continue;
+        if (oldestTs === null || t < oldestTs) oldestTs = t;
+        if (newestTs === null || t > newestTs) newestTs = t;
+      }
+    }
+
+    return json(res, 200, {
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      store: {
+        path: STORE_FILE,
+        fileSize: storeStat.size,
+        lastModified: storeStat.mtime,
+        totalRecords,
+        oldestRecord: oldestTs ? new Date(oldestTs).toISOString() : null,
+        newestRecord: newestTs ? new Date(newestTs).toISOString() : null,
+        categories,
+      },
+      files: {
+        config:    { path: CONFIG_FILE, ...configStat },
+        auditLog:  { path: path.join(__dirname, 'audit.log.ndjson'), ...auditStat },
+        serverLog: { path: path.join(__dirname, 'server.log'), ...serverLog },
+        serverErr: { path: path.join(__dirname, 'server.err'), ...serverErr },
+      },
+      runtime: {
+        uptime: Math.floor(process.uptime()),
+        memUsed: process.memoryUsage().rss,
+        nodeVersion: process.version,
+        platform: process.platform,
+        pid: process.pid,
+      },
+    });
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -414,6 +537,229 @@ const server = http.createServer(async (req, res) => {
   ══════════════════════════════════════════════════════════ */
   if (pathname === '/api/config' && method === 'GET') {
     return json(res, 200, { webhookSecretSet: !!_config.webhookSecret, devMode: !_config.webhookSecret });
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     POST /api/wazuh-test (Backend proxy to test Wazuh API)
+  ══════════════════════════════════════════════════════════ */
+  if (pathname === '/api/wazuh-test' && method === 'POST') {
+    let body;
+    try { body = JSON.parse(await readBody(req)); } catch { return json(res, 400, { ok: false, error: 'Invalid JSON' }); }
+
+    const { baseUrl, authMode, username, password, token, sslVerify } = body;
+    if (!baseUrl) return json(res, 400, { ok: false, error: 'Manager API URL is required' });
+
+    try {
+      const targetUrl = new URL(baseUrl);
+      const isHttps = targetUrl.protocol === 'https:';
+      const httpModule = isHttps ? https : http;
+
+      if (authMode === 'token') {
+        const pingReq = httpModule.request({
+          hostname: targetUrl.hostname,
+          port: targetUrl.port || (isHttps ? 443 : 80),
+          path: '/',
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token || ''}`,
+            'User-Agent': 'Aegis-SOC/1.0'
+          },
+          rejectUnauthorized: sslVerify === true,
+          timeout: 10000
+        }, (testRes) => {
+          let data = '';
+          testRes.on('data', chunk => data += chunk);
+          testRes.on('end', () => {
+            if (testRes.statusCode >= 200 && testRes.statusCode < 400) {
+              return json(res, 200, { ok: true, token, message: 'Token verified successfully' });
+            } else {
+              return json(res, 200, { ok: false, error: `Wazuh returned HTTP ${testRes.statusCode}: ${data.slice(0, 100)}` });
+            }
+          });
+        });
+
+        pingReq.on('error', (err) => {
+          return json(res, 200, { ok: false, error: `Connection failed: ${err.message}` });
+        });
+        pingReq.on('timeout', () => {
+          pingReq.destroy();
+          return json(res, 200, { ok: false, error: 'Connection timed out after 10 seconds' });
+        });
+        pingReq.end();
+
+      } else {
+        const authStr = Buffer.from(`${username || ''}:${password || ''}`).toString('base64');
+        const authReq = httpModule.request({
+          hostname: targetUrl.hostname,
+          port: targetUrl.port || (isHttps ? 443 : 80),
+          path: '/security/user/authenticate',
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${authStr}`,
+            'Content-Type': 'application/json',
+            'User-Agent': 'Aegis-SOC/1.0'
+          },
+          rejectUnauthorized: sslVerify === true,
+          timeout: 10000
+        }, (authRes) => {
+          let data = '';
+          authRes.on('data', chunk => data += chunk);
+          authRes.on('end', () => {
+            try {
+              const parsed = JSON.parse(data);
+              if (authRes.statusCode === 200 && parsed?.data?.token) {
+                return json(res, 200, { ok: true, token: parsed.data.token, message: 'Authenticated successfully' });
+              } else if (authRes.statusCode === 200 && parsed?.token) {
+                return json(res, 200, { ok: true, token: parsed.token, message: 'Authenticated successfully' });
+              } else {
+                const errMsg = parsed?.message || parsed?.error || `HTTP ${authRes.statusCode}: Authentication failed (check credentials)`;
+                return json(res, 200, { ok: false, error: errMsg });
+              }
+            } catch (e) {
+              if (authRes.statusCode === 200) {
+                return json(res, 200, { ok: true, message: 'Connected successfully' });
+              }
+              return json(res, 200, { ok: false, error: `Wazuh returned HTTP ${authRes.statusCode}: ${data.slice(0, 150)}` });
+            }
+          });
+        });
+
+        authReq.on('error', (err) => {
+          return json(res, 200, { ok: false, error: `Connection failed: ${err.message}` });
+        });
+        authReq.on('timeout', () => {
+          authReq.destroy();
+          return json(res, 200, { ok: false, error: 'Connection timed out after 10 seconds' });
+        });
+        authReq.end();
+      }
+
+    } catch (err) {
+      return json(res, 200, { ok: false, error: `Invalid URL or test error: ${err.message}` });
+    }
+    return;
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     REDMINE INTEGRATION API ENDPOINTS
+  ══════════════════════════════════════════════════════════ */
+
+  /* GET /api/redmine/config */
+  if (pathname === '/api/redmine/config' && method === 'GET') {
+    return json(res, 200, {
+      ok: true,
+      config: {
+        redmineUrl: _config.redmineUrl || '',
+        redmineApiKey: _config.redmineApiKey ? '••••••••' + _config.redmineApiKey.slice(-4) : '',
+        hasApiKey: Boolean(_config.redmineApiKey),
+        redmineProject: _config.redmineProject || '',
+        redmineTrackerId: _config.redmineTrackerId || '1',
+        redmineTriggerMode: _config.redmineTriggerMode || 'min_level',
+        redmineMinLevel: _config.redmineMinLevel || '7',
+        redmineCustomRules: _config.redmineCustomRules || '',
+        redmineDedupHours: _config.redmineDedupHours || '24',
+        redmineAutoTicket: _config.redmineAutoTicket !== false,
+      }
+    });
+  }
+
+  /* PUT /api/redmine/config */
+  if (pathname === '/api/redmine/config' && method === 'PUT') {
+    if (!isAdminIpAllowed(remoteIp)) return denyAdminIp(res, remoteIp);
+    if (!enforceRateLimit(`redmine_cfg:${remoteIp}`, 60000, 20)) return;
+
+    let body;
+    try { body = JSON.parse(await readBody(req)); } catch { return json(res, 400, { error: 'Invalid JSON body' }); }
+
+    if (body.redmineUrl !== undefined) _config.redmineUrl = String(body.redmineUrl).trim();
+    if (body.redmineApiKey !== undefined && !body.redmineApiKey.includes('••••')) {
+      _config.redmineApiKey = String(body.redmineApiKey).trim();
+    }
+    if (body.redmineProject !== undefined) _config.redmineProject = String(body.redmineProject).trim();
+    if (body.redmineTrackerId !== undefined) _config.redmineTrackerId = String(body.redmineTrackerId).trim();
+    if (body.redmineTriggerMode !== undefined) _config.redmineTriggerMode = String(body.redmineTriggerMode).trim();
+    if (body.redmineMinLevel !== undefined) _config.redmineMinLevel = String(body.redmineMinLevel).trim();
+    if (body.redmineCustomRules !== undefined) _config.redmineCustomRules = String(body.redmineCustomRules).trim();
+    if (body.redmineDedupHours !== undefined) _config.redmineDedupHours = String(body.redmineDedupHours).trim();
+    if (body.redmineAutoTicket !== undefined) _config.redmineAutoTicket = Boolean(body.redmineAutoTicket);
+
+    _saveConfig();
+    logAudit({
+      user: req.headers['x-aegis-user'] || 'admin',
+      action: 'config_update',
+      filename: 'redmine.config',
+      before: 'redmine config',
+      after: `Updated Redmine: URL=${_config.redmineUrl}, TriggerMode=${_config.redmineTriggerMode}, MinLevel=${_config.redmineMinLevel}, Dedup=${_config.redmineDedupHours}h, AutoTicket=${_config.redmineAutoTicket}`,
+    }).catch(() => {});
+
+    return json(res, 200, { ok: true, message: 'Redmine settings saved successfully' });
+  }
+
+  /* POST /api/redmine/test */
+  if (pathname === '/api/redmine/test' && method === 'POST') {
+    if (!enforceRateLimit(`redmine_test:${remoteIp}`, 60000, 15)) return;
+
+    let body;
+    try { body = JSON.parse(await readBody(req)); } catch { return json(res, 400, { error: 'Invalid JSON body' }); }
+
+    const baseUrl = body.redmineUrl || _config.redmineUrl;
+    let apiKey = body.redmineApiKey;
+    if (!apiKey || apiKey.includes('••••')) apiKey = _config.redmineApiKey;
+
+    const result = await testRedmineConnection({ baseUrl, apiKey });
+    return json(res, result.ok ? 200 : 400, result);
+  }
+
+  /* POST /api/redmine/sync */
+  if (pathname === '/api/redmine/sync' && method === 'POST') {
+    if (!isAdminIpAllowed(remoteIp)) return denyAdminIp(res, remoteIp);
+    if (!enforceRateLimit(`redmine_sync:${remoteIp}`, 60000, 10)) return;
+
+    const result = await syncRedmineIssues(_config);
+    return json(res, result.ok ? 200 : 400, result);
+  }
+
+  /* POST /api/redmine/webhook */
+  if (pathname === '/api/redmine/webhook' && method === 'POST') {
+    let body;
+    try { body = JSON.parse(await readBody(req)); } catch { return json(res, 400, { error: 'Invalid JSON body' }); }
+
+    const issue = body.issue || body.payload?.issue || body;
+    const action = body.action || 'updated';
+    const author = body.author?.name || body.journal?.user?.name || 'Redmine User';
+
+    if (issue?.id) {
+      const issueUrl = `${(_config.redmineUrl || '').replace(/\/+$/, '')}/issues/${issue.id}`;
+      await logAudit({
+        user: author,
+        action: 'redmine_fix_synced',
+        filename: `Redmine Issue #${issue.id}`,
+        before: `Issue ${action}: ${issue.subject || ''}`,
+        after: `Status: ${issue.status?.name || 'Updated'}\nURL: ${issueUrl}\nNotes: ${body.journal?.notes || issue.description || ''}`,
+      }).catch(() => {});
+      console.log(`[Redmine Webhook] Synced issue #${issue.id} (${action})`);
+    }
+
+    return json(res, 200, { ok: true, message: 'Webhook received' });
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     SSH TUNNEL STATUS & CONTROL ENDPOINTS
+  ══════════════════════════════════════════════════════════ */
+  if (pathname === '/api/tunnel') {
+    if (method === 'GET') {
+      return json(res, 200, { ok: true, running: _tunnelState.running, info: _tunnelState });
+    }
+    if (method === 'POST') {
+      _tunnelState.running = true;
+      _tunnelState.startedAt = new Date().toISOString();
+      return json(res, 200, { ok: true, running: true, message: 'Tunnel opened' });
+    }
+    if (method === 'DELETE') {
+      _tunnelState.running = false;
+      _tunnelState.startedAt = null;
+      return json(res, 200, { ok: true, running: false, message: 'Tunnel closed' });
+    }
   }
 
   /* ══════════════════════════════════════════════════════════

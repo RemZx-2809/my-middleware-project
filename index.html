@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="css/layout.css" />
   <link rel="stylesheet" href="css/components.css" />
   <link rel="stylesheet" href="css/states.css" />
+  <link rel="stylesheet" href="css/top-charts.css" />
 
   <!-- Clean up legacy Service Workers from previous projects on localhost -->
   <script>
@@ -72,22 +73,26 @@
         <span class="nav-tooltip">Dashboard</span>
       </div>
 
-      <div id="nav-rules" class="nav-item" role="button" tabindex="0"
-           aria-label="Rules Management">
-        <i data-lucide="file-code-2"></i>
-        <span class="nav-label">Rules Management</span>
-        <span class="nav-tooltip">Rules Management</span>
+      <div id="nav-discover" class="nav-item" role="button" tabindex="0"
+           aria-label="Discover">
+        <i data-lucide="compass"></i>
+        <span class="nav-label">Discover</span>
+        <span class="nav-tooltip">Discover / Logs</span>
       </div>
 
-      <div id="nav-terminal" class="nav-item" role="button" tabindex="0"
-           aria-label="Server Console">
-        <i data-lucide="terminal"></i>
-        <span class="nav-label">Server Console</span>
-        <span class="nav-tooltip">Server Console</span>
+      <div id="nav-storage" class="nav-item" role="button" tabindex="0"
+           aria-label="Database Storage">
+        <i data-lucide="database"></i>
+        <span class="nav-label">Database</span>
+        <span class="nav-tooltip">Database Storage</span>
       </div>
 
-
-
+      <div id="nav-history" class="nav-item" role="button" tabindex="0"
+           aria-label="File Edit History">
+        <i data-lucide="history"></i>
+        <span class="nav-label">History</span>
+        <span class="nav-tooltip">File Edit History</span>
+      </div>
 
     </nav>
 
@@ -141,12 +146,20 @@
       <!-- Right side controls -->
       <div class="topbar-right">
 
-        <!-- Connection Status -->
+        <!-- Connection Status (Wazuh) -->
         <div id="conn-status" class="conn-status" data-state="not-connected"
              role="status" aria-live="polite" aria-label="Wazuh connection status">
           <span class="pulse-dot pulse-dot--dim" aria-hidden="true"></span>
           <span class="conn-status-text">NOT CONNECTED</span>
         </div>
+
+        <!-- Redmine Connection Status Badge -->
+        <button id="redmine-status-badge" class="redmine-status-badge" data-state="disconnected"
+                type="button" role="status" aria-live="polite" aria-label="Redmine connection status" title="Redmine: Checking… (Click to open Settings)">
+          <span class="redmine-status-dot" aria-hidden="true"></span>
+          <i data-lucide="ticket" aria-hidden="true"></i>
+          <span class="redmine-status-text">Redmine</span>
+        </button>
 
         <!-- SSH Tunnel Toggle Button -->
         <button id="tunnel-btn" class="tunnel-btn" data-state="closed"
@@ -281,120 +294,199 @@
         </div><!-- /tr-dropdown -->
       </div><!-- /time-range-bar -->
 
-      <!-- ════════════════════════════════════════════
-           KPI STRIP
-      ════════════════════════════════════════════ -->
-      <section class="kpi-strip" aria-label="Key performance indicators">
-
-        <!-- KPI 1: Critical Alerts -->
-        <article id="kpi-critical-alerts" class="kpi-card" data-state="loading"
-                 aria-label="Critical alerts KPI">
-          <div class="kpi-card-header">
-            <span class="kpi-card-label">Critical Alerts</span>
-            <div class="kpi-icon kpi-icon--crit" aria-hidden="true">
-              <i data-lucide="shield-alert"></i>
-            </div>
-          </div>
-          <!-- Skeleton -->
-          <div class="kpi-skel-value skeleton"></div>
-          <!-- Value (shown in empty/data state) -->
-          <div class="kpi-value" aria-label="Critical alerts count">—</div>
-          <!-- Skeleton delta -->
-          <div class="kpi-skel-delta skeleton"></div>
-          <!-- Delta -->
-          <div class="kpi-delta kpi-delta--flat" aria-label="Change since last period">
-            <i data-lucide="minus" aria-hidden="true"></i>
-            <span class="kpi-delta-text">awaiting Wazuh data</span>
-          </div>
-        </article>
-
-        <!-- KPI 2: Blind Spots -->
-        <article id="kpi-blind-spots" class="kpi-card" data-state="loading"
-                 aria-label="Blind spots KPI">
-          <div class="kpi-card-header">
-            <span class="kpi-card-label">Blind Spots</span>
-            <div class="kpi-icon kpi-icon--crit" aria-hidden="true">
-              <i data-lucide="eye-off"></i>
-            </div>
-          </div>
-          <div class="kpi-skel-value skeleton"></div>
-          <div class="kpi-value" aria-label="Blind spots count">—</div>
-          <div class="kpi-skel-delta skeleton"></div>
-          <div class="kpi-delta kpi-delta--flat">
-            <i data-lucide="minus" aria-hidden="true"></i>
-            <span class="kpi-delta-text">awaiting Wazuh data</span>
-          </div>
-        </article>
-
-        <!-- KPI 3: File / System Changes -->
-        <article id="kpi-file-changes" class="kpi-card" data-state="loading"
-                 aria-label="File and system changes KPI">
-          <div class="kpi-card-header">
-            <span class="kpi-card-label">File / System Changes</span>
-            <div class="kpi-icon kpi-icon--warn" aria-hidden="true">
-              <i data-lucide="file-pen-line"></i>
-            </div>
-          </div>
-          <div class="kpi-skel-value skeleton"></div>
-          <div class="kpi-value" aria-label="File and system changes count">—</div>
-          <div class="kpi-skel-delta skeleton"></div>
-          <div class="kpi-delta kpi-delta--flat">
-            <i data-lucide="minus" aria-hidden="true"></i>
-            <span class="kpi-delta-text">awaiting Wazuh data</span>
-          </div>
-        </article>
-
-        <!-- KPI 4: Access Anomalies -->
-        <article id="kpi-access-anomalies" class="kpi-card" data-state="loading"
-                 aria-label="Access anomalies KPI">
-          <div class="kpi-card-header">
-            <span class="kpi-card-label">Access Anomalies</span>
-            <div class="kpi-icon kpi-icon--warn" aria-hidden="true">
-              <i data-lucide="user-x"></i>
-            </div>
-          </div>
-          <div class="kpi-skel-value skeleton"></div>
-          <div class="kpi-value" aria-label="Access anomalies count">—</div>
-          <div class="kpi-skel-delta skeleton"></div>
-          <div class="kpi-delta kpi-delta--flat">
-            <i data-lucide="minus" aria-hidden="true"></i>
-            <span class="kpi-delta-text">awaiting Wazuh data</span>
-          </div>
-        </article>
-
-        <!-- KPI 5: Threat Intel Matches -->
-        <article id="kpi-threat-intel" class="kpi-card" data-state="loading"
-                 aria-label="Threat intelligence matches KPI">
-          <div class="kpi-card-header">
-            <span class="kpi-card-label">Threat Intel Matches</span>
-            <div class="kpi-icon kpi-icon--accent" aria-hidden="true">
-              <i data-lucide="crosshair"></i>
-            </div>
-          </div>
-          <div class="kpi-skel-value skeleton"></div>
-          <div class="kpi-value" aria-label="Threat intel matches count">—</div>
-          <div class="kpi-skel-delta skeleton"></div>
-          <div class="kpi-delta kpi-delta--flat">
-            <i data-lucide="minus" aria-hidden="true"></i>
-            <span class="kpi-delta-text">awaiting Wazuh data</span>
-          </div>
-        </article>
-
-      </section><!-- /kpi-strip -->
+      <!-- Active Filter Row (Kibana style) -->
+      <div id="top-chart-filter-row" class="discover-filter-row" style="display:none; padding: 2px 6px; margin-top: -6px;"></div>
 
       <!-- ════════════════════════════════════════════
-           PANEL GRID
+           SECTION 2: SOC USE CASES & DETECTIONS
       ════════════════════════════════════════════ -->
-      <div class="panel-grid" aria-label="Security data panels">
+      <div id="section-use-cases" class="dash-section" role="tabpanel" aria-label="SOC Use Cases and Detections">
 
-        <!-- ── LEFT COLUMN ──────────────────────── -->
-        <div class="panel-col">
+        <!-- ── Top 4 Overview Summary Cards ── -->
+        <section id="overview-kpi-strip" class="overview-kpi-strip" aria-label="Security Overview KPI Summary">
 
-          <!-- ── PANEL 1: Critical Alerts ─────── -->
-          <section id="panel-critical-alerts" class="panel"
-                   aria-label="Critical alerts panel">
-            <header class="panel-header">
-              <div class="panel-header-icon panel-header-icon--crit" aria-hidden="true">
+          <!-- Card 1: Total -->
+          <article class="overview-kpi-card" id="kpi-ov-total" title="Total security events">
+            <div class="overview-kpi-value text-teal" id="kpi-val-total">0</div>
+            <div class="overview-kpi-label">- Total -</div>
+          </article>
+
+          <!-- Card 2: Level 12 or above alerts -->
+          <article class="overview-kpi-card" id="kpi-ov-level12" title="Click to filter level 12 or above alerts">
+            <div class="overview-kpi-value text-red" id="kpi-val-level12">0</div>
+            <div class="overview-kpi-label">- Level 12 or above alerts -</div>
+          </article>
+
+          <!-- Card 3: Authentication failure -->
+          <article class="overview-kpi-card" id="kpi-ov-auth-fail" title="Click to filter authentication failure alerts">
+            <div class="overview-kpi-value text-coral" id="kpi-val-auth-fail">0</div>
+            <div class="overview-kpi-label">- Authentication failure -</div>
+          </article>
+
+          <!-- Card 4: Authentication success -->
+          <article class="overview-kpi-card" id="kpi-ov-auth-success" title="Click to filter authentication success alerts">
+            <div class="overview-kpi-value text-teal" id="kpi-val-auth-success">0</div>
+            <div class="overview-kpi-label">- Authentication success -</div>
+          </article>
+
+        </section><!-- /overview-kpi-strip -->
+
+        <!-- ════════════════════════════════════════════
+             SOC USE CASES KPI STRIP (5 CARDS)
+        ════════════════════════════════════════════ -->
+        <section class="kpi-strip" aria-label="Key performance indicators">
+
+          <!-- KPI 1: Critical Alerts -->
+          <article id="kpi-critical-alerts" class="kpi-card" data-state="loading"
+                   aria-label="Critical alerts KPI">
+            <div class="kpi-card-header">
+              <span class="kpi-card-label">Critical Alerts</span>
+              <div class="kpi-icon kpi-icon--crit" aria-hidden="true">
+                <i data-lucide="shield-alert"></i>
+              </div>
+            </div>
+            <!-- Skeleton -->
+            <div class="kpi-skel-value skeleton"></div>
+            <!-- Value (shown in empty/data state) -->
+            <div class="kpi-value" aria-label="Critical alerts count">—</div>
+            <!-- Skeleton delta -->
+            <div class="kpi-skel-delta skeleton"></div>
+            <!-- Delta -->
+            <div class="kpi-delta kpi-delta--flat" aria-label="Change since last period">
+              <i data-lucide="minus" aria-hidden="true"></i>
+              <span class="kpi-delta-text">awaiting Wazuh data</span>
+            </div>
+          </article>
+
+          <!-- KPI 2: Device Names -->
+          <article id="kpi-blind-spots" class="kpi-card" data-state="loading"
+                   aria-label="Device names KPI">
+            <div class="kpi-card-header">
+              <span class="kpi-card-label">Device Names</span>
+              <div class="kpi-icon kpi-icon--crit" aria-hidden="true">
+                <i data-lucide="monitor"></i>
+              </div>
+            </div>
+            <div class="kpi-skel-value skeleton"></div>
+            <div class="kpi-value" aria-label="Device names count">—</div>
+            <div class="kpi-skel-delta skeleton"></div>
+            <div class="kpi-delta kpi-delta--flat">
+              <i data-lucide="minus" aria-hidden="true"></i>
+              <span class="kpi-delta-text">awaiting Wazuh data</span>
+            </div>
+          </article>
+
+          <!-- KPI 3: Redmine Resolved Fixes -->
+          <article id="kpi-file-changes" class="kpi-card" data-state="loading"
+                   aria-label="Redmine resolved fixes KPI">
+            <div class="kpi-card-header">
+              <span class="kpi-card-label">Redmine Resolved Fixes</span>
+              <div class="kpi-icon kpi-icon--ok" aria-hidden="true">
+                <i data-lucide="file-check-2"></i>
+              </div>
+            </div>
+            <div class="kpi-skel-value skeleton"></div>
+            <div class="kpi-value" aria-label="Redmine resolved fixes count">—</div>
+            <div class="kpi-skel-delta skeleton"></div>
+            <div class="kpi-delta kpi-delta--flat">
+              <i data-lucide="minus" aria-hidden="true"></i>
+              <span class="kpi-delta-text">awaiting Redmine data</span>
+            </div>
+          </article>
+
+          <!-- KPI 4: Access Anomalies -->
+          <article id="kpi-access-anomalies" class="kpi-card" data-state="loading"
+                   aria-label="Access anomalies KPI">
+            <div class="kpi-card-header">
+              <span class="kpi-card-label">Access Anomalies</span>
+              <div class="kpi-icon kpi-icon--warn" aria-hidden="true">
+                <i data-lucide="user-x"></i>
+              </div>
+            </div>
+            <div class="kpi-skel-value skeleton"></div>
+            <div class="kpi-value" aria-label="Access anomalies count">—</div>
+            <div class="kpi-skel-delta skeleton"></div>
+            <div class="kpi-delta kpi-delta--flat">
+              <i data-lucide="minus" aria-hidden="true"></i>
+              <span class="kpi-delta-text">awaiting Wazuh data</span>
+            </div>
+          </article>
+
+          <!-- KPI 5: Threat Intel Matches -->
+          <article id="kpi-threat-intel" class="kpi-card" data-state="loading"
+                   aria-label="Threat intelligence matches KPI">
+            <div class="kpi-card-header">
+              <span class="kpi-card-label">Threat Intel Matches</span>
+              <div class="kpi-icon kpi-icon--accent" aria-hidden="true">
+                <i data-lucide="crosshair"></i>
+              </div>
+            </div>
+            <div class="kpi-skel-value skeleton"></div>
+            <div class="kpi-value" aria-label="Threat intel matches count">—</div>
+            <div class="kpi-skel-delta skeleton"></div>
+            <div class="kpi-delta kpi-delta--flat">
+              <i data-lucide="minus" aria-hidden="true"></i>
+              <span class="kpi-delta-text">awaiting Wazuh data</span>
+            </div>
+          </article>
+
+        </section><!-- /kpi-strip -->
+
+        <!-- ════════════════════════════════════════════
+             TOP SECURITY VISUALIZATIONS (4 CHARTS)
+        ════════════════════════════════════════════ -->
+        <section id="dashboard-top-charts" class="top-charts-grid" aria-label="Top Security Visualizations">
+
+          <!-- ── Chart 1: Top 10 Alert level evolution ── -->
+          <article id="card-alert-level-evolution" class="top-chart-card" aria-label="Top 10 Alert level evolution">
+            <header class="top-chart-header">
+              <h2 class="top-chart-title">Top 10 Alert level evolution</h2>
+              <div class="top-chart-legend" id="legend-alert-level-evolution" aria-label="Alert level legend"></div>
+            </header>
+            <div class="top-chart-body" id="chart-alert-level-evolution"></div>
+          </article>
+
+          <!-- ── Chart 2: Top 10 MITRE ATT&CKS ────────── -->
+          <article id="card-mitre-attacks" class="top-chart-card" aria-label="Top 10 MITRE ATT&CKS">
+            <header class="top-chart-header">
+              <h2 class="top-chart-title">Top 10 MITRE ATT&CKS</h2>
+            </header>
+            <div class="top-chart-body" id="chart-mitre-attacks"></div>
+          </article>
+
+          <!-- ── Chart 3: Top 5 Device Names ──────────── -->
+          <article id="card-top-agents" class="top-chart-card" aria-label="Top 5 Device Names">
+            <header class="top-chart-header">
+              <h2 class="top-chart-title">Top 5 Device Names</h2>
+              <div class="top-chart-legend" id="legend-top-agents" aria-label="Top Device Names legend"></div>
+            </header>
+            <div class="top-chart-body" id="chart-top-agents"></div>
+          </article>
+
+          <!-- ── Chart 4: Alerts evolution - Top 5 Device Names ─ -->
+          <article id="card-agent-alerts-evolution" class="top-chart-card" aria-label="Alerts evolution - Top 5 Device Names">
+            <header class="top-chart-header">
+              <h2 class="top-chart-title">Alerts evolution - Top 5 Device Names</h2>
+              <div class="top-chart-legend" id="legend-agent-alerts-evolution" aria-label="Device Names evolution legend"></div>
+            </header>
+            <div class="top-chart-body" id="chart-agent-alerts-evolution"></div>
+          </article>
+
+        </section><!-- /dashboard-top-charts -->
+
+        <!-- ════════════════════════════════════════════
+             PANEL GRID
+        ════════════════════════════════════════════ -->
+        <div class="panel-grid" aria-label="Security data panels">
+
+          <!-- ── LEFT COLUMN ──────────────────────── -->
+          <div class="panel-col">
+
+            <!-- ── PANEL 1: Critical Alerts ─────── -->
+            <section id="panel-critical-alerts" class="panel"
+                     aria-label="Critical alerts panel">
+              <header class="panel-header">
+                <div class="panel-header-icon panel-header-icon--crit" aria-hidden="true">
                 <i data-lucide="shield-alert"></i>
               </div>
               <h2 class="panel-title">Critical Alerts</h2>
@@ -474,16 +566,16 @@
             </div><!-- /panel-body -->
           </section><!-- /panel-critical-alerts -->
 
-          <!-- ── PANEL 2: File & System Changes ─ -->
+          <!-- ── PANEL 2: Redmine Resolved Fixes ─ -->
           <section id="panel-file-changes" class="panel"
-                   aria-label="Critical file and system changes panel">
+                   aria-label="Redmine resolved fixes and file patches panel">
             <header class="panel-header">
-              <div class="panel-header-icon panel-header-icon--warn" aria-hidden="true">
-                <i data-lucide="file-pen-line"></i>
+              <div class="panel-header-icon panel-header-icon--ok" aria-hidden="true">
+                <i data-lucide="file-check-2"></i>
               </div>
-              <h2 class="panel-title">Critical File & System Changes</h2>
-              <span class="panel-count-badge" aria-label="Change count">0</span>
-              <button class="panel-refresh-btn" aria-label="Refresh file integrity events">
+              <h2 class="panel-title">Redmine Resolved Fixes</h2>
+              <span class="panel-count-badge" aria-label="Resolved fix count">0</span>
+              <button class="panel-refresh-btn" aria-label="Refresh Redmine resolved fixes">
                 <i data-lucide="refresh-cw"></i>
               </button>
             </header>
@@ -527,8 +619,8 @@
                 <div class="empty-icon empty-icon--ok">
                   <i data-lucide="file-check-2"></i>
                 </div>
-                <p class="empty-title">No integrity violations detected</p>
-                <p class="empty-sub">File Integrity Monitoring reports no critical changes.</p>
+                <p class="empty-title">No resolved fixes recorded</p>
+                <p class="empty-sub">Issues and file patches resolved in Redmine will appear here.</p>
               </div>
 
               <!-- Error -->
@@ -563,15 +655,15 @@
         <!-- ── RIGHT COLUMN ─────────────────────── -->
         <div class="panel-col">
 
-          <!-- ── PANEL 3: Blind Spots & Agent Health -->
+          <!-- ── PANEL 3: Device Names -->
           <section id="panel-blind-spots" class="panel"
-                   aria-label="Blind spots and agent health panel">
+                   aria-label="Device names panel">
             <header class="panel-header">
               <div class="panel-header-icon panel-header-icon--crit" aria-hidden="true">
-                <i data-lucide="eye-off"></i>
+                <i data-lucide="monitor"></i>
               </div>
-              <h2 class="panel-title">Blind Spots & Agent Health</h2>
-              <span class="panel-count-badge" aria-label="Offline agent count">0</span>
+              <h2 class="panel-title">Device Names</h2>
+              <span class="panel-count-badge" aria-label="Device count">0</span>
               <button class="panel-refresh-btn" aria-label="Refresh agent status">
                 <i data-lucide="refresh-cw"></i>
               </button>
@@ -828,10 +920,143 @@
 
       </div><!-- /panel-grid -->
 
+      </div><!-- /section-use-cases -->
+
       </div><!-- /view-dashboard -->
 
       <!-- ════════════════════════════════════════════
-           SETTINGS VIEW (EMPTY PLACEHOLDER)
+           DISCOVER VIEW (KIBANA / OPENSEARCH LOG EXPLORER)
+      ════════════════════════════════════════════ -->
+      <div id="view-discover" class="discover-container" style="display: none; flex-direction: column; gap: var(--sp-4, 16px);">
+        
+        <!-- Search & Control Bar -->
+        <div class="discover-search-bar">
+          <div class="discover-search-input-wrap">
+            <i data-lucide="search" style="width:16px;height:16px;color:#94a3b8;margin-right:8px;"></i>
+            <input type="text" id="discover-search-input" class="discover-search-input" placeholder="Search incidents, rules, IPs, agents..." autocomplete="off" />
+            <span class="dql-badge" title="Kibana / OpenSearch DQL Search Syntax">DQL</span>
+          </div>
+
+          <div class="discover-controls-right">
+            <button class="btn-kibana" id="discover-timerange-btn" title="Quick select time range">
+              <i data-lucide="calendar" style="width:14px;height:14px;"></i>
+              <i data-lucide="chevron-down" style="width:12px;height:12px;margin-right:2px;"></i>
+              <span id="discover-time-label">Last 24 hours</span>
+            </button>
+            <button class="btn-kibana" id="discover-show-dates-btn">Show dates</button>
+            <button class="btn-kibana btn-kibana--primary" id="discover-refresh-btn">
+              <i data-lucide="refresh-cw" style="width:14px;height:14px;"></i>
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Pill Row -->
+        <div class="discover-filter-row" id="discover-filter-row">
+          <!-- Dynamically populated by DiscoverController -->
+        </div>
+
+        <!-- Histogram Chart Card -->
+        <div class="discover-histogram-card">
+          <div id="discover-histogram-wrap" class="histogram-svg-wrap">
+            <!-- Rendered by DiscoverController -->
+          </div>
+        </div>
+
+        <!-- Hits Toolbar & Actions -->
+        <div class="discover-hits-toolbar">
+          <div class="discover-hits-info">
+            <span class="hits-count" id="discover-hits-count">— hits</span>
+            <span class="hits-sub" id="discover-hits-sub">—</span>
+          </div>
+
+          <div class="discover-actions-right">
+            <button class="action-btn" id="discover-export-btn" title="Export matching logs as JSON/CSV">
+              <i data-lucide="download" style="width:13px;height:13px;"></i>
+              Export Formatted
+            </button>
+            <button class="action-btn" id="discover-reset-btn" title="Reset all filters and view settings">
+              <i data-lucide="rotate-ccw" style="width:13px;height:13px;"></i>
+              Reset view
+            </button>
+            <button class="action-btn" id="discover-fields-btn" title="Browse all available fields">
+              <i data-lucide="database" style="width:13px;height:13px;"></i>
+              718 available fields <i data-lucide="info" style="width:11px;height:11px;"></i>
+            </button>
+            <button class="action-btn" id="discover-columns-btn" title="Customize visible table columns">
+              <i data-lucide="list" style="width:13px;height:13px;"></i>
+              Columns
+            </button>
+            <button class="action-btn" id="discover-density-btn" title="Change row spacing density">
+              <i data-lucide="align-justify" style="width:13px;height:13px;"></i>
+              <span id="discover-density-label">Density</span>
+            </button>
+            <button class="action-btn" id="discover-sort-btn" title="Change sorting order">
+              <i data-lucide="arrow-up-down" style="width:13px;height:13px;"></i>
+              <span id="discover-sort-label">1 fields sorted</span>
+            </button>
+            <button class="action-btn" id="discover-fullscreen-btn" title="Toggle full screen mode">
+              <i data-lucide="maximize" style="width:13px;height:13px;"></i>
+              Full screen
+            </button>
+          </div>
+        </div>
+
+        <!-- Events Table Card -->
+        <div class="discover-table-card">
+          <div class="discover-table-responsive">
+            <table class="discover-table" id="discover-table">
+              <thead>
+                <tr>
+                  <th style="width: 44px; text-align: center;"></th>
+                  <th style="width: 220px;">
+                    <span class="th-content">
+                      <span class="th-sort-arrow">&darr;</span>
+                      timestamp
+                    </span>
+                  </th>
+                  <th style="width: 170px;">
+                    <span class="th-content">agent.name</span>
+                  </th>
+                  <th>
+                    <span class="th-content">rule.description</span>
+                  </th>
+                  <th style="width: 100px; text-align: center;">
+                    <span class="th-content">rule.level</span>
+                  </th>
+                  <th style="width: 110px;">
+                    <span class="th-content">rule.id</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="discover-table-tbody">
+                <!-- Dynamically rendered -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Footer -->
+          <div class="discover-pagination-footer">
+            <div class="pag-rows-select">
+              <span>Rows per page:</span>
+              <select id="discover-rows-select" class="pag-select">
+                <option value="10">10</option>
+                <option value="15" selected>15</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+            <div class="pag-nav" id="discover-pag-nav">
+              <!-- Dynamically rendered -->
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /view-discover -->
+
+      <!-- ════════════════════════════════════════════
+           SETTINGS VIEW
       ════════════════════════════════════════════ -->
       <div id="view-settings" style="display: none; flex-direction: column; gap: var(--sp-5);">
 
@@ -1131,7 +1356,7 @@
             </div>
           </div>
 
-          <!-- BOTTOM ACTION BAR -->
+          <!-- WAZUH BOTTOM ACTION BAR -->
           <div class="int-bottom-bar">
             <div class="int-bottom-left">
               <button id="wazuh-clear-btn" class="int-btn int-btn--outline-danger" type="button" aria-label="Clear saved Wazuh settings">
@@ -1148,217 +1373,467 @@
             </div>
           </div>
 
-        </section><!-- /settings-integrations -->
+          <!-- ════════════════════════════════════════════
+               REDMINE INTEGRATION SECTION
+          ════════════════════════════════════════════ -->
+          <div class="settings-section-header" style="margin-top: var(--sp-8); padding-top: var(--sp-6); border-top: 1px solid rgba(255,255,255,0.06);">
+            <div class="settings-section-icon" style="background: rgba(167,139,250,0.10); border-color: rgba(167,139,250,0.25); color: #a78bfa;">
+              <i data-lucide="ticket"></i>
+            </div>
+            <div class="settings-section-text">
+              <div class="settings-section-title-row">
+                <h2 class="settings-section-title">Redmine Integration &amp; Issue Sync</h2>
+              </div>
+              <p class="settings-section-sub">Auto-dispatch security incident tickets to Redmine and sync vulnerability resolution history</p>
+            </div>
+          </div>
 
+          <div class="int-grid">
+            <!-- Left Card: Connection & Project -->
+            <div class="int-card">
+              <div class="int-card-header">
+                <div class="int-card-title-group">
+                  <h3 class="int-card-title">Server Connection</h3>
+                  <p class="int-card-subtitle">Redmine instance URL and API access key</p>
+                </div>
+              </div>
+              <div class="int-card-body">
+                <div class="int-field">
+                  <label class="int-label" for="redmine-url">
+                    <span>Redmine Server URL <span class="int-label-required">*</span></span>
+                  </label>
+                  <div class="int-input-wrap">
+                    <span class="int-input-icon"><i data-lucide="globe"></i></span>
+                    <input type="url" id="redmine-url" class="int-input" placeholder="http://redmine.yourdomain.com" autocomplete="off" />
+                  </div>
+                </div>
+
+                <div class="int-field">
+                  <label class="int-label" for="redmine-api-key">
+                    <span>API Access Key <span class="int-label-required">*</span></span>
+                    <i data-lucide="info" class="int-info-icon" title="From Redmine: My account -> API access key"></i>
+                  </label>
+                  <div class="int-input-wrap">
+                    <span class="int-input-icon"><i data-lucide="key"></i></span>
+                    <input type="password" id="redmine-api-key" class="int-input int-input--mono" placeholder="Enter Redmine API Key" autocomplete="off" />
+                    <button class="int-input-reveal" id="redmine-key-reveal-btn" aria-label="Toggle API key visibility" type="button">
+                      <i data-lucide="eye"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="int-field">
+                  <label class="int-label" for="redmine-project">
+                    <span>Project Identifier / ID <span class="int-label-required">*</span></span>
+                    <i data-lucide="info" class="int-info-icon" title="Project slug in Redmine (e.g. security-incidents)"></i>
+                  </label>
+                  <div class="int-input-wrap">
+                    <span class="int-input-icon"><i data-lucide="folder-git-2"></i></span>
+                    <input type="text" id="redmine-project" class="int-input" placeholder="e.g. soc-alerts" autocomplete="off" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Card: Auto-Ticketing Policy & Deduplication -->
+            <div class="int-card">
+              <div class="int-card-header">
+                <div class="int-card-title-group">
+                  <h3 class="int-card-title">Auto-Ticket Policy &amp; Deduplication</h3>
+                  <p class="int-card-subtitle">Rules, filters, and anti-duplicate suppression window</p>
+                </div>
+              </div>
+              <div class="int-card-body">
+                <div class="int-field">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                    <label class="int-label" style="margin-bottom:0;" for="redmine-auto-ticket">
+                      <span>Enable Auto-Ticketing</span>
+                    </label>
+                    <input type="checkbox" id="redmine-auto-ticket" checked style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--accent);" />
+                  </div>
+                  <span class="int-field-hint">Automatically opens a Redmine Issue whenever a matching rule alert arrives.</span>
+                </div>
+
+                <div class="int-field">
+                  <label class="int-label" for="redmine-trigger-mode">
+                    <span>Trigger Condition / Policy</span>
+                  </label>
+                  <div class="int-input-wrap">
+                    <span class="int-input-icon"><i data-lucide="filter"></i></span>
+                    <select id="redmine-trigger-mode" class="int-input" style="cursor: pointer;">
+                      <option value="min_level" selected>Severity Threshold (Level &ge; X)</option>
+                      <option value="custom_rules">Specific Rule IDs / Keywords</option>
+                      <option value="all">All Security Alerts (Any Rule)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="int-field" id="redmine-min-level-wrap">
+                  <label class="int-label" for="redmine-min-level">
+                    <span>Minimum Severity Level</span>
+                  </label>
+                  <div class="int-input-wrap">
+                    <span class="int-input-icon"><i data-lucide="shield-alert"></i></span>
+                    <select id="redmine-min-level" class="int-input" style="cursor: pointer;">
+                      <option value="7" selected>Level 7+ (High &amp; Critical Incidents)</option>
+                      <option value="10">Level 10+ (Very High &amp; Critical)</option>
+                      <option value="12">Level 12+ (Critical Attacks Only)</option>
+                      <option value="14">Level 14+ (Immediate Threat Only)</option>
+                      <option value="4">Level 4+ (All Warnings &amp; Attacks)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="int-field" id="redmine-custom-rules-wrap" style="display:none;">
+                  <label class="int-label" for="redmine-custom-rules">
+                    <span>Target Rule IDs / Keywords</span>
+                    <i data-lucide="info" class="int-info-icon" title="Comma-separated Rule IDs (e.g. 81628, 5710, 550) or description keywords"></i>
+                  </label>
+                  <div class="int-input-wrap">
+                    <span class="int-input-icon"><i data-lucide="list-checks"></i></span>
+                    <input type="text" id="redmine-custom-rules" class="int-input" placeholder="e.g. 81628, 5710, attack, netstat" />
+                  </div>
+                </div>
+
+                <div class="int-field">
+                  <label class="int-label" for="redmine-dedup-hours">
+                    <span>Anti-Duplicate Suppression Window</span>
+                    <i data-lucide="info" class="int-info-icon" title="Prevents spamming duplicate tickets for the same device and same rule/file within this timeframe"></i>
+                  </label>
+                  <div class="int-input-wrap">
+                    <span class="int-input-icon"><i data-lucide="history"></i></span>
+                    <select id="redmine-dedup-hours" class="int-input" style="cursor: pointer;">
+                      <option value="24" selected>24 Hours (Recommended - 1 ticket/day per issue)</option>
+                      <option value="12">12 Hours</option>
+                      <option value="6">6 Hours</option>
+                      <option value="1">1 Hour</option>
+                      <option value="0">Disabled (Send every single alert)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div><!-- /int-grid (redmine) -->
+
+          <!-- REDMINE TEST & SYNC CARD -->
+          <div class="int-card int-card--test">
+            <div class="int-test-card-body">
+              <div class="int-test-title-group">
+                <h3 class="int-card-title">Test &amp; Sync Redmine</h3>
+                <p class="int-card-subtitle">Verify your Redmine connection and pull recent resolved issues</p>
+              </div>
+
+              <div class="int-test-action" style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button id="redmine-test-btn" class="int-btn" style="background: rgba(167,139,250,0.12); border: 1px solid rgba(167,139,250,0.3); color: #c4b5fd;" type="button">
+                  <i data-lucide="wifi"></i>
+                  Test Connection
+                </button>
+                <button id="redmine-sync-btn" class="int-btn" style="background: rgba(45,212,167,0.12); border: 1px solid rgba(45,212,167,0.3); color: #2dd4a7;" type="button">
+                  <i data-lucide="refresh-cw"></i>
+                  Sync Fix History Now
+                </button>
+              </div>
+            </div>
+
+            <!-- Test Result Banner -->
+            <div id="redmine-test-result" class="int-test-result" role="status" aria-live="polite" style="display:none;">
+              <div class="int-result-icon"><i data-lucide="loader-2"></i></div>
+              <div class="int-result-body">
+                <span class="int-result-title">Testing…</span>
+                <span class="int-result-detail"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- REDMINE BOTTOM ACTION BAR -->
+          <div class="int-bottom-bar" style="margin-bottom: var(--sp-4);">
+            <div class="int-bottom-left">
+              <span style="font-size: 11px; color: var(--text-lo); font-family: 'JetBrains Mono', monospace;">REDMINE REST API v1</span>
+            </div>
+            <div class="int-bottom-right">
+              <button id="redmine-save-btn" class="int-btn int-btn--primary" type="button">
+                <i data-lucide="save"></i>
+                Save Redmine Settings
+              </button>
+            </div>
+          </div>
+
+        </section><!-- /settings-integrations -->
 
       </div><!-- /view-settings -->
 
       <!-- ════════════════════════════════════════════
-           RULES MANAGEMENT VIEW
+           DATABASE STORAGE VIEW
       ════════════════════════════════════════════ -->
-      <div id="view-rules" class="view-rules-container" style="display: none;">
+      <div id="view-storage" style="display:none; flex-direction:column; gap:var(--sp-5);">
 
-        <!-- HEADER CARD -->
-        <div class="rules-header-card">
-          <div class="rules-title-group">
-            <h2 class="rules-title">
-              <i data-lucide="file-code-2"></i>
-              Wazuh Rules Manager
-            </h2>
-            <p class="rules-subtitle">Fetch, edit, and apply custom XML rule configurations to Wazuh Manager</p>
+        <!-- Header Bar -->
+        <div class="db-view-header">
+          <div class="db-view-header-left">
+            <div class="db-header-icon"><i data-lucide="database"></i></div>
+            <div>
+              <h1 class="db-view-title">Database Storage</h1>
+              <p class="db-view-subtitle">Middleware data store usage &amp; health</p>
+            </div>
           </div>
-
-          <div class="rules-controls-group">
-            <!-- New File Button -->
-            <button id="rule-new-btn" class="int-btn int-btn--neutral" type="button" title="Create new XML rule file">
-              <i data-lucide="file-plus"></i>
-              New File
-            </button>
-
-            <!-- Refresh Button -->
-            <button id="rule-refresh-btn" class="int-btn int-btn--neutral" type="button" title="Refresh XML rule files from server (GET /rules/files)">
+          <div class="db-view-header-right">
+            <span class="db-last-updated" id="db-last-updated">—</span>
+            <button id="db-refresh-btn" class="db-refresh-btn" aria-label="Refresh database stats">
               <i data-lucide="refresh-cw"></i>
-            </button>
-
-            <!-- Restart Manager Button (Header - separate button with confirm dialog for downtime) -->
-            <button id="rule-restart-btn" class="int-btn int-btn--outline-danger" type="button" title="Restart Wazuh Manager (Requires confirmation due to service downtime)">
-              <i data-lucide="rotate-cw"></i>
-              Restart Manager
-            </button>
-
-            <!-- Save Rules Button (PUT) -->
-            <button id="rule-save-btn" class="int-btn int-btn--primary" type="button">
-              <i data-lucide="save"></i>
-              บันทึก Rules (PUT)
+              Refresh
             </button>
           </div>
         </div>
 
-        <!-- SPLIT 2-PANEL WORKSPACE -->
-        <div class="rules-workspace">
-
-          <!-- LEFT PANEL: FILE EXPLORER LIST -->
-          <aside class="rules-file-explorer" aria-label="Rule files Explorer">
-            <div class="rules-explorer-header">
-              <div class="rules-explorer-title-row">
-                <span class="rules-explorer-title">
-                  <i data-lucide="folder-code" style="width: 14px; height: 14px; color: var(--accent);"></i>
-                  Rule Files
-                </span>
-                <span id="rule-file-count" class="rules-file-count-badge">0 files</span>
-              </div>
-              <div class="rules-search-wrap">
-                <i data-lucide="search" class="rules-search-icon"></i>
-                <input id="rule-file-search" type="text" class="rules-search-input" placeholder="Filter rule files..." autocomplete="off" spellcheck="false" />
-              </div>
+        <!-- KPI Row -->
+        <div class="db-kpi-row">
+          <div class="db-kpi-card db-kpi-card--accent">
+            <div class="db-kpi-icon"><i data-lucide="hard-drive"></i></div>
+            <div class="db-kpi-body">
+              <span class="db-kpi-label">Store File Size</span>
+              <span class="db-kpi-value" id="db-kpi-store-size">—</span>
             </div>
-
-            <!-- Scrollable File List -->
-            <div id="rule-file-list" class="rules-file-list">
-              <!-- Dynamically populated by RulesEditorController.fetchRuleFilesList() -->
+          </div>
+          <div class="db-kpi-card db-kpi-card--ok">
+            <div class="db-kpi-icon"><i data-lucide="list"></i></div>
+            <div class="db-kpi-body">
+              <span class="db-kpi-label">Total Records</span>
+              <span class="db-kpi-value" id="db-kpi-total-records">—</span>
             </div>
-          </aside>
+          </div>
+          <div class="db-kpi-card db-kpi-card--warn">
+            <div class="db-kpi-icon"><i data-lucide="memory-stick"></i></div>
+            <div class="db-kpi-body">
+              <span class="db-kpi-label">Memory Usage</span>
+              <span class="db-kpi-value" id="db-kpi-mem">—</span>
+            </div>
+          </div>
+          <div class="db-kpi-card db-kpi-card--blue">
+            <div class="db-kpi-icon"><i data-lucide="clock"></i></div>
+            <div class="db-kpi-body">
+              <span class="db-kpi-label">Server Uptime</span>
+              <span class="db-kpi-value" id="db-kpi-uptime">—</span>
+            </div>
+          </div>
+        </div>
 
-          <!-- RIGHT PANEL: MONACO CODE EDITOR CARD -->
-          <div class="rule-editor-card">
-            <div class="rule-editor-toolbar">
-              <div class="rule-toolbar-left">
-                <span class="rules-file-badge">
-                  <i data-lucide="file-code" style="width: 12px; height: 12px; color: var(--accent);"></i>
-                  <span id="rule-current-filename">local_rules.xml</span>
-                </span>
-                <span id="rule-status-text" class="rule-status-tag">Ready</span>
-                <span class="rule-lang-badge">XML</span>
-              </div>
-              <div class="rule-toolbar-right">
-                <button id="rule-format-btn" class="rule-tool-btn" type="button" title="Format XML markup">
-                  <i data-lucide="align-left" style="width: 12px; height: 12px;"></i>
-                  Format XML
-                </button>
-                <button id="rule-copy-btn" class="rule-tool-btn" type="button" title="Copy XML content to clipboard">
-                  <i data-lucide="copy" style="width: 12px; height: 12px;"></i>
-                  Copy
-                </button>
+        <!-- Main Grid: Storage Breakdown + File System -->
+        <div class="db-grid">
+
+          <!-- Left: Alert Category Breakdown -->
+          <div class="db-card db-card--wide">
+            <div class="db-card-header">
+              <div class="db-card-header-icon"><i data-lucide="bar-chart-3"></i></div>
+              <div>
+                <h2 class="db-card-title">Alert Category Breakdown</h2>
+                <p class="db-card-subtitle">Record count &amp; estimated storage per category</p>
               </div>
             </div>
-
-            <!-- Monaco / Fallback Editor Body -->
-            <div class="rule-editor-body">
-              <div id="rule-monaco-editor" class="rule-monaco-container"></div>
-            </div>
-
-            <div class="rule-editor-statusbar">
-              <span id="rule-editor-stats">Ln 1, Col 1  •  0 lines  •  0 chars</span>
-              <span class="rule-statusbar-right">
-                <span class="rule-kb-hint"><kbd>Ctrl</kbd> + <kbd>S</kbd> Save</span>
-                <span>UTF-8</span>
-              </span>
+            <div class="db-card-body">
+              <div id="db-category-bars" class="db-category-bars">
+                <!-- Rendered by JS -->
+              </div>
             </div>
           </div>
 
-        </div><!-- /rules-workspace -->
+          <!-- Right: File System Info -->
+          <div class="db-card">
+            <div class="db-card-header">
+              <div class="db-card-header-icon"><i data-lucide="folder-open"></i></div>
+              <div>
+                <h2 class="db-card-title">Data Files</h2>
+                <p class="db-card-subtitle">Middleware file sizes on disk</p>
+              </div>
+            </div>
+            <div class="db-card-body">
+              <div id="db-file-list" class="db-file-list">
+                <!-- Rendered by JS -->
+              </div>
+            </div>
+          </div>
 
-      </div><!-- /view-rules -->
+        </div><!-- /db-grid -->
+
+        <!-- Record Timeline Card -->
+        <div class="db-card db-card--full">
+          <div class="db-card-header">
+            <div class="db-card-header-icon"><i data-lucide="calendar-range"></i></div>
+            <div>
+              <h2 class="db-card-title">Data Record Timeline</h2>
+              <p class="db-card-subtitle">Oldest and newest records stored in the middleware database</p>
+            </div>
+          </div>
+          <div class="db-card-body db-timeline-body">
+            <div class="db-timeline-row">
+              <div class="db-timeline-item db-timeline-item--old">
+                <i data-lucide="arrow-up-from-line"></i>
+                <div class="db-timeline-info">
+                  <span class="db-timeline-label">Oldest Record</span>
+                  <span class="db-timeline-val" id="db-oldest-ts">—</span>
+                </div>
+              </div>
+              <div class="db-timeline-bar-wrap">
+                <div class="db-timeline-bar" id="db-timeline-bar"></div>
+              </div>
+              <div class="db-timeline-item db-timeline-item--new">
+                <i data-lucide="arrow-down-to-line"></i>
+                <div class="db-timeline-info">
+                  <span class="db-timeline-label">Newest Record</span>
+                  <span class="db-timeline-val" id="db-newest-ts">—</span>
+                </div>
+              </div>
+            </div>
+            <div class="db-store-path-row">
+              <i data-lucide="file-json-2"></i>
+              <span id="db-store-path" class="db-store-path-text">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Runtime Info Card -->
+        <div class="db-card db-card--full">
+          <div class="db-card-header">
+            <div class="db-card-header-icon"><i data-lucide="cpu"></i></div>
+            <div>
+              <h2 class="db-card-title">Runtime Environment</h2>
+              <p class="db-card-subtitle">Node.js process information</p>
+            </div>
+          </div>
+          <div class="db-card-body">
+            <div id="db-runtime-grid" class="db-runtime-grid">
+              <!-- Rendered by JS -->
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /view-storage -->
 
       <!-- ════════════════════════════════════════════
-           SERVER CONSOLE / REMOTE TERMINAL VIEW
+           FILE EDIT HISTORY VIEW
       ════════════════════════════════════════════ -->
-      <div id="view-terminal" class="view-terminal-container" style="display: none;">
+      <div id="view-history" style="display:none; flex-direction:column; gap:var(--sp-5);">
 
-        <!-- Header Card -->
-        <div class="rules-header-card">
-          <div class="rules-title-group">
-            <h2 class="rules-title">
-              <i data-lucide="terminal"></i>
-              Server Console
-            </h2>
-            <p class="rules-subtitle">Execute Linux commands directly on Wazuh Server (10.145.10.57) without opening PowerShell</p>
-          </div>
-
-          <div class="rules-controls-group">
-            <div style="display:flex; align-items:center; gap:var(--sp-2); padding: 4px 10px; background:var(--surface-2); border-radius:var(--radius-sm); border:1px solid var(--border-subtle); font-size:var(--fs-xs);">
-              <span style="width:8px; height:8px; border-radius:50%; background:var(--ok);"></span>
-              <span style="color:var(--text-mid); font-family:var(--font-mono);">tawaikiar_p@10.145.10.57</span>
+        <!-- Page Header -->
+        <div class="fh-header">
+          <div class="fh-header-left">
+            <div class="fh-header-icon"><i data-lucide="history"></i></div>
+            <div>
+              <h1 class="fh-title">File Edit History</h1>
+              <p class="fh-subtitle">Audit trail of all file changes tracked by the middleware</p>
             </div>
-            <button id="term-clear-btn" class="int-btn int-btn--neutral" type="button" title="Clear terminal screen">
-              <i data-lucide="trash-2"></i>
-              Clear
+          </div>
+          <div class="fh-header-right">
+            <span class="fh-live-badge"><span class="fh-live-dot"></span>Live</span>
+            <span class="fh-last-updated" id="fh-last-updated">—</span>
+            <button id="fh-refresh-btn" class="fh-refresh-btn" aria-label="Refresh history">
+              <i data-lucide="refresh-cw"></i>
+              Refresh
             </button>
           </div>
         </div>
 
-        <!-- Quick Actions Preset Toolbar -->
-        <div class="term-presets-bar">
-          <span class="term-presets-label"><i data-lucide="sparkles"></i> Quick Commands:</span>
-          <button class="term-preset-chip" data-cmd="sudo systemctl status wazuh-manager --no-pager" title="Check Wazuh Manager status">
-            <i data-lucide="activity"></i> Wazuh Status
-          </button>
-          <button class="term-preset-chip" data-cmd="sudo systemctl restart wazuh-manager" title="Restart Wazuh Manager">
-            <i data-lucide="refresh-cw"></i> Restart Manager
-          </button>
-          <button class="term-preset-chip" data-cmd="sudo /var/ossec/bin/agent_control -l" title="List all connected agents">
-            <i data-lucide="users"></i> Active Agents
-          </button>
-          <button class="term-preset-chip" data-cmd="fuser -k 3000/tcp 2>/dev/null || true; echo Port 3000 cleared" title="Free up port 3000">
-            <i data-lucide="cable"></i> Clear Port 3000
-          </button>
-          <button class="term-preset-chip" data-cmd="sudo tail -n 25 /var/ossec/logs/ossec.log" title="View last 25 lines of ossec.log">
-            <i data-lucide="file-text"></i> System Log
-          </button>
-          <button class="term-preset-chip" data-cmd="sudo tail -n 10 /var/ossec/logs/alerts/alerts.json" title="View last 10 raw alerts">
-            <i data-lucide="shield-alert"></i> Raw Alerts Log
-          </button>
-          <button class="term-preset-chip" data-cmd="uptime; free -m; df -h /" title="Check server resource usage">
-            <i data-lucide="cpu"></i> System Health
+
+
+        <!-- Toolbar: Search + Filter + Export -->
+        <div class="fh-toolbar">
+          <div class="fh-search-wrap">
+            <i data-lucide="search" class="fh-search-icon"></i>
+            <input type="search" id="fh-search" class="fh-search-input"
+                   placeholder="Search filename, user, action…" autocomplete="off" />
+          </div>
+          <div class="fh-filter-group">
+            <select id="fh-filter-action" class="fh-select" aria-label="Filter by action">
+              <option value="">All Actions</option>
+              <option value="rule_created">Rule Created</option>
+              <option value="rule_updated">Rule Updated</option>
+              <option value="rule_deleted">Rule Deleted</option>
+              <option value="redmine_issue_created">Redmine Issue Created</option>
+              <option value="redmine_fix_synced">Redmine Fix Synced</option>
+              <option value="config_update">Config Changed</option>
+              <option value="data_cleared">Data Cleared</option>
+            </select>
+            <select id="fh-filter-limit" class="fh-select" aria-label="Limit">
+              <option value="50">Last 50</option>
+              <option value="100">Last 100</option>
+              <option value="200" selected>Last 200</option>
+              <option value="500">Last 500</option>
+            </select>
+          </div>
+          <button id="fh-clear-btn" class="fh-danger-btn" title="Clear all audit history">
+            <i data-lucide="trash-2"></i>
+            Clear History
           </button>
         </div>
 
-        <!-- Terminal Window Frame -->
-        <div class="terminal-window">
-          <div class="terminal-titlebar">
-            <div class="terminal-dots">
-              <span class="term-dot term-dot--red"></span>
-              <span class="term-dot term-dot--yellow"></span>
-              <span class="term-dot term-dot--green"></span>
+        <!-- Timeline Table -->
+        <div class="fh-card">
+          <div class="fh-card-header">
+            <div class="fh-card-header-icon"><i data-lucide="git-branch"></i></div>
+            <div>
+              <h2 class="fh-card-title">Audit Trail</h2>
+              <p class="fh-card-subtitle">Chronological log of all file and configuration changes</p>
             </div>
-            <div class="terminal-tab-title">
-              <i data-lucide="terminal" style="width:12px;height:12px;"></i>
-              bash — tawaikiar_p@wazuh-server
-            </div>
-            <button id="term-root-toggle" class="term-preset-chip" style="margin-left:auto; padding:3px 10px; font-size:11px; border-color:var(--border-subtle);" type="button" title="Toggle Root / Sudo Mode">
-              <i data-lucide="shield"></i> Root Mode: OFF
-            </button>
+            <span class="fh-row-count" id="fh-row-count">0 entries</span>
           </div>
-
-          <!-- Output Screen -->
-          <div id="terminal-screen" class="terminal-screen" role="log" aria-live="polite">
-            <div class="term-line term-line--system">
-              [Aegis SOC Web Terminal v1.0] Connected to tawaikiar_p@10.145.10.57 via SSH Key.
+          <div class="fh-table-wrap">
+            <table class="fh-table" role="grid" aria-label="File Edit History">
+              <thead>
+                <tr>
+                  <th class="fh-th fh-th--ts">Timestamp</th>
+                  <th class="fh-th fh-th--action">Action</th>
+                  <th class="fh-th fh-th--file">Filename</th>
+                  <th class="fh-th fh-th--user">User</th>
+                  <th class="fh-th fh-th--detail">Detail</th>
+                  <th class="fh-th fh-th--expand"></th>
+                </tr>
+              </thead>
+              <tbody id="fh-table-body">
+                <!-- Rendered by JS -->
+              </tbody>
+            </table>
+            <!-- Empty / loading states -->
+            <div id="fh-empty" class="fh-empty-state" style="display:none;">
+              <i data-lucide="inbox"></i>
+              <span>No history records found</span>
             </div>
-            <div class="term-line term-line--hint">
-              Type any Linux / Wazuh command below or click a Quick Command preset above. Press Enter to execute. Type <code>sudo -i</code> to enter Root Mode.
+            <div id="fh-loading" class="fh-loading-state" style="display:none;">
+              <div class="fh-spinner"></div>
+              <span>Loading history…</span>
             </div>
           </div>
-
-          <!-- Input Bar -->
-          <form id="terminal-form" class="terminal-input-bar">
-            <span id="term-prompt-label" class="term-prompt">tawaikiar_p@wazuh:~$</span>
-            <input
-              type="text"
-              id="terminal-input"
-              class="term-input"
-              placeholder="Enter command (e.g. sudo systemctl status wazuh-manager, sudo -i, ls -la /var/ossec)..."
-              autocomplete="off"
-              spellcheck="false"
-            />
-            <button id="term-run-btn" class="int-btn int-btn--primary term-run-btn" type="submit" aria-label="Execute command">
-              <i data-lucide="corner-down-left"></i>
-              Run
-            </button>
-          </form>
         </div>
 
-      </div><!-- /view-terminal -->
+        <!-- Diff Modal (hidden, shown on row expand) -->
+        <div id="fh-diff-modal" class="fh-diff-modal" role="dialog" aria-modal="true" aria-label="Change details" style="display:none;">
+          <div class="fh-diff-backdrop" id="fh-diff-backdrop"></div>
+          <div class="fh-diff-panel">
+            <div class="fh-diff-header">
+              <div class="fh-diff-title-wrap">
+                <div class="fh-diff-icon"><i data-lucide="diff"></i></div>
+                <div>
+                  <h3 class="fh-diff-title" id="fh-diff-filename">—</h3>
+                  <span class="fh-diff-meta" id="fh-diff-meta">—</span>
+                </div>
+              </div>
+              <button id="fh-diff-close" class="fh-diff-close" aria-label="Close">
+                <i data-lucide="x"></i>
+              </button>
+            </div>
+            <div class="fh-diff-body">
+              <div class="fh-diff-col">
+                <div class="fh-diff-col-label fh-diff-col-label--before"><i data-lucide="minus-circle"></i> Before</div>
+                <pre class="fh-diff-pre fh-diff-pre--before" id="fh-diff-before"></pre>
+              </div>
+              <div class="fh-diff-divider"></div>
+              <div class="fh-diff-col">
+                <div class="fh-diff-col-label fh-diff-col-label--after"><i data-lucide="plus-circle"></i> After</div>
+                <pre class="fh-diff-pre fh-diff-pre--after" id="fh-diff-after"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /view-history -->
 
     </main><!-- /main-content -->
   </div><!-- /main-wrapper -->
@@ -1367,53 +1842,22 @@
 <!-- ── Toast Container ──────────────────────────────────── -->
 <div id="toast-container" aria-live="polite" aria-label="Notifications"></div>
 
-<!-- ── Restart Manager Popup Modal ────────────────────── -->
-<div id="restart-modal" class="restart-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-  <div class="restart-modal-dialog">
-    <div class="restart-modal-header">
-      <div id="modal-title" class="restart-modal-title">
-        <i data-lucide="alert-triangle"></i>
-        ยืนยันการ Restart Wazuh Manager
-      </div>
-      <button id="modal-close-btn" class="restart-modal-close" type="button" aria-label="Close modal">✕</button>
-    </div>
-    <div class="restart-modal-body">
-      <p style="margin: 0; font-weight: 500; color: var(--text-hi);">
-        คุณต้องการสั่ง Restart Wazuh Manager เพื่อให้กฎใหม่มีผลใช้งานหรือไม่?
-      </p>
-      <div class="restart-modal-info-box">
-        <i data-lucide="alert-octagon" style="width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px; color: var(--crit);"></i>
-        <div>
-          <strong>ข้อควรระวังเรื่อง Downtime:</strong><br/>
-          การกด Restart จะทำให้ Wazuh Manager หยุดทำงานชั่วคราว (ประมาณ 10–30 วินาที) ในระหว่างนี้ระบบจะไม่สามารถประมวลผล Alert หรือ Rule ใหม่ได้ชั่วขณะ
-        </div>
-      </div>
-    </div>
-    <div class="restart-modal-footer">
-      <button id="modal-later-btn" class="int-btn int-btn--neutral" type="button">
-        ไว้ทีหลัง (Cancel)
-      </button>
-      <button id="modal-restart-btn" class="int-btn int-btn--outline-danger" type="button" style="background: rgba(244, 87, 106, 0.15); border-color: var(--crit);">
-        <i data-lucide="refresh-cw"></i>
-        ยืนยัน Restart Manager ตอนนี้
-      </button>
-    </div>
-  </div>
-</div>
-
 <!-- ── Scripts ──────────────────────────────────────────── -->
 <script src="js/wazuh.js"></script>
 <script src="js/panels.js"></script>
 <script src="js/sidebar.js"></script>
 <script src="js/topbar.js"></script>
 <script src="js/integrations.js"></script>
-<script src="js/rules-editor.js"></script>
-
-<script src="js/terminal.js"></script>
 <script src="js/receiver.js"></script>
 <script src="js/time-range.js"></script>
+<script src="js/top-charts.js"></script>
+<script src="js/discover.js"></script>
+<script src="js/db-storage.js"></script>
+<script src="js/file-history.js"></script>
+<script src="js/redmine.js"></script>
 <script src="js/app.js"></script>
 
 </body>
 </html>
+
 

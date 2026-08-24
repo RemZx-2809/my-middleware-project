@@ -526,6 +526,75 @@ html, body {
 
 .conn-status-text { white-space: nowrap; }
 
+/* Redmine Status Badge */
+.redmine-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 99px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-mid);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+  white-space: nowrap;
+}
+.redmine-status-badge svg { width: 13px; height: 13px; flex-shrink: 0; }
+.redmine-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #64748b;
+  flex-shrink: 0;
+  transition: background var(--t-fast), box-shadow var(--t-fast);
+}
+
+.redmine-status-badge[data-state="connected"] {
+  background: var(--ok-dim);
+  border-color: var(--ok-glow);
+  color: var(--ok);
+}
+.redmine-status-badge[data-state="connected"] .redmine-status-dot {
+  background: var(--ok);
+  box-shadow: 0 0 6px var(--ok);
+}
+
+.redmine-status-badge[data-state="connecting"] {
+  background: var(--warn-dim);
+  border-color: var(--warn-glow);
+  color: var(--warn);
+}
+.redmine-status-badge[data-state="connecting"] .redmine-status-dot {
+  background: var(--warn);
+  animation: pulse-dot 1s ease-in-out infinite;
+}
+
+.redmine-status-badge[data-state="error"] {
+  background: var(--crit-dim);
+  border-color: var(--crit-glow);
+  color: var(--crit);
+}
+.redmine-status-badge[data-state="error"] .redmine-status-dot {
+  background: var(--crit);
+}
+
+.redmine-status-badge[data-state="disconnected"] {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-lo);
+}
+.redmine-status-badge[data-state="disconnected"]:hover {
+  background: var(--surface-2);
+  border-color: #a78bfa;
+  color: #c4b5fd;
+}
+
 /* SSH Tunnel Button */
 .tunnel-btn {
   display: flex;

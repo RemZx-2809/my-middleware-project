@@ -39,18 +39,18 @@ const TopbarController = (() => {
         dropdownSettings.addEventListener('click', (e) => {
           e.stopPropagation();
           const dashboardView = document.getElementById('view-dashboard');
+          const discoverView  = document.getElementById('view-discover');
           const settingsView  = document.getElementById('view-settings');
-          const rulesView     = document.getElementById('view-rules');
           const breadcrumb    = document.getElementById('breadcrumb-current');
           const navDashboard  = document.getElementById('nav-dashboard');
-          const navRules      = document.getElementById('nav-rules');
+          const navDiscover   = document.getElementById('nav-discover');
 
           if (dashboardView) dashboardView.style.display = 'none';
-          if (rulesView)     rulesView.style.display     = 'none';
+          if (discoverView)  discoverView.style.display  = 'none';
           if (settingsView)  settingsView.style.display  = 'flex';
           if (breadcrumb)    breadcrumb.textContent      = 'Settings';
           if (navDashboard)  navDashboard.classList.remove('active');
-          if (navRules)      navRules.classList.remove('active');
+          if (navDiscover)   navDiscover.classList.remove('active');
 
           _accountMenu.classList.remove('open');
           _accountBtn.classList.remove('open');
@@ -78,8 +78,19 @@ const TopbarController = (() => {
       setConnectionState(e.detail.current);
     });
 
-    // Initialize to not-connected
-    setConnectionState('not-connected');
+    // Check persisted Wazuh configuration state from localStorage
+    let initialConnected = false;
+    try {
+      const raw = localStorage.getItem('aegis-wazuh-config');
+      if (raw) {
+        const cfg = JSON.parse(raw);
+        if (cfg && (cfg.isConnected || cfg.savedAt || cfg.baseUrl)) {
+          initialConnected = true;
+        }
+      }
+    } catch (_) {}
+
+    setConnectionState(initialConnected ? 'connected' : 'not-connected');
 
     // SSH Tunnel button wiring
     _initTunnelBtn();

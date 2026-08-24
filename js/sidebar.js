@@ -12,8 +12,9 @@ const SidebarController = (() => {
 
   const NAV_ITEMS = [
     { id: 'nav-dashboard', label: 'Security Overview', breadcrumb: 'Security Overview' },
-    { id: 'nav-rules',     label: 'Rules Management', breadcrumb: 'Rules Management' },
-    { id: 'nav-terminal',  label: 'Server Console',   breadcrumb: 'Server Console' },
+    { id: 'nav-discover',  label: 'Discover',          breadcrumb: 'Discover / Logs' },
+    { id: 'nav-storage',   label: 'Database',          breadcrumb: 'Database Storage' },
+    { id: 'nav-history',   label: 'History',           breadcrumb: 'File Edit History' },
   ];
 
   function init() {
@@ -52,21 +53,30 @@ const SidebarController = (() => {
     });
 
     const dashboardView = document.getElementById('view-dashboard');
+    const discoverView  = document.getElementById('view-discover');
     const settingsView  = document.getElementById('view-settings');
-    const rulesView     = document.getElementById('view-rules');
-    const terminalView  = document.getElementById('view-terminal');
+    const storageView   = document.getElementById('view-storage');
+    const historyView   = document.getElementById('view-history');
 
     if (dashboardView) dashboardView.style.display = (activeId === 'nav-dashboard') ? 'flex' : 'none';
-    if (settingsView)  settingsView.style.display  = (activeId === 'nav-settings')  ? 'flex' : 'none';
-    if (rulesView)     rulesView.style.display     = (activeId === 'nav-rules')     ? 'flex' : 'none';
-    if (terminalView)  terminalView.style.display  = (activeId === 'nav-terminal')  ? 'flex' : 'none';
-
-    if (activeId === 'nav-rules' && window.RulesEditorController) {
-      window.RulesEditorController.onViewOpen();
+    if (discoverView) {
+      discoverView.style.display = (activeId === 'nav-discover') ? 'flex' : 'none';
+      if (activeId === 'nav-discover' && window.DiscoverController && typeof window.DiscoverController.reload === 'function') {
+        window.DiscoverController.reload();
+      }
     }
-
-    if (activeId === 'nav-terminal' && window.TerminalController) {
-      window.TerminalController.onViewOpen();
+    if (settingsView)  settingsView.style.display  = (activeId === 'nav-settings')  ? 'flex' : 'none';
+    if (storageView) {
+      storageView.style.display = (activeId === 'nav-storage') ? 'flex' : 'none';
+      if (activeId === 'nav-storage' && window.DbStorageController && typeof window.DbStorageController.load === 'function') {
+        window.DbStorageController.load();
+      }
+    }
+    if (historyView) {
+      historyView.style.display = (activeId === 'nav-history') ? 'flex' : 'none';
+      if (activeId === 'nav-history' && window.FileHistoryController && typeof window.FileHistoryController.load === 'function') {
+        window.FileHistoryController.load();
+      }
     }
 
     if (_breadcrumbEl && breadcrumb) {

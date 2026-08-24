@@ -192,6 +192,7 @@ const TimeRangePicker = (() => {
           PanelManager.ingestAlerts(useCase, alerts || [], true);
         }
       }
+      window.dispatchEvent(new CustomEvent('aegis:data-updated'));
     } catch (e) {
       console.warn('[TimeRangePicker] Reload failed:', e.message);
     }
@@ -222,16 +223,45 @@ const TimeRangePicker = (() => {
     return d.toISOString().slice(0, 16);
   }
 
+  function _fmtDateShort(d) {
+    if (!d || isNaN(d.getTime())) return '';
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const m = months[d.getMonth()];
+    const day = d.getDate();
+    const yr = d.getFullYear();
+    const hh = d.getHours().toString().padStart(2, '0');
+    const mm = d.getMinutes().toString().padStart(2, '0');
+    const ss = d.getSeconds().toString().padStart(2, '0');
+    return `${m} ${day}, ${yr} @ ${hh}:${mm}:${ss}`;
+  }
+
   function isInRange(alert) {
     if (!_from || !_to) return true;
     const ts = alert?.timestamp || alert?.receivedAt || alert?.['@timestamp'];
     if (!ts) return true;
     const t = new Date(ts).getTime();
-    return !isNaN(t) && t >= _from.getTime() && t <= _to.getTime();
+    if (isNaN(t)) return true;
+    return t >= _from.getTime() && t <= _to.getTime();
+  }
+
+  function setAbsolute(from, to, label) {
+    const f = (from instanceof Date) ? from : new Date(from);
+    const t = (to instanceof Date) ? to : new Date(to);
+    if (isNaN(f.getTime()) || isNaN(t.getTime())) return;
+    const l = label || `${_fmtDateShort(f)} → ${_fmtDateShort(t)}`;
+    _applyAbsolute(f, t, l);
   }
 
   /* ── Public ─────────────────────────────────────────────── */
-  return { init, reload: _reload, isInRange };
+  return {
+    init,
+    reload: _reload,
+    isInRange,
+    getRange: () => ({ from: _from, to: _to, label: _label }),
+    setAbsolute,
+    reset: () => _applyPreset('all-time'),
+    applyPreset: _applyPreset,
+  };
 })();
 
 window.TimeRangePicker = TimeRangePicker;
