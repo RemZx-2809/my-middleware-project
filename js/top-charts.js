@@ -332,13 +332,13 @@ const TopChartsController = (() => {
      0. SECURITY OVERVIEW KPIS (Total, Level 12+, Auth Fail, Auth Success)
   ════════════════════════════════════════════════════════════ */
   function renderOverviewKpis() {
-    // Total counters always calculated from total loaded alerts
-    const total = _allAlerts.length;
+    const filtered = _getFilteredAlerts();
+    const total = filtered.length;
     let level12Count = 0;
     let authFailCount = 0;
     let authSuccessCount = 0;
 
-    _allAlerts.forEach(a => {
+    filtered.forEach(a => {
       const lvl = parseInt(a?.rule?.level ?? 0, 10);
       if (lvl >= 12) level12Count++;
       if (isAuthFailAlert(a)) authFailCount++;
@@ -1341,8 +1341,10 @@ const TopChartsController = (() => {
         const fieldChecked = document.getElementById('popover-toggle-field')?.checked;
 
         if (timeChecked && data.bStart && data.bEnd) {
+          const fromD = new Date(data.bStart);
+          const toD = new Date(data.bEnd);
           if (window.TimeRangePicker && typeof window.TimeRangePicker.setAbsolute === 'function') {
-            window.TimeRangePicker.setAbsolute(data.bStart, data.bEnd);
+            window.TimeRangePicker.setAbsolute(fromD, toD, `🎯 ${_formatKibanaTimestamp(fromD)} → ${_formatKibanaTimestamp(toD)}`);
           }
         }
 
@@ -1360,6 +1362,18 @@ const TopChartsController = (() => {
               return true;
             });
           }
+          if (window.DiscoverController && typeof window.DiscoverController.addFieldFilter === 'function') {
+            window.DiscoverController.addFieldFilter(data.field, String(data.value));
+          }
+        }
+
+        if (window.Toast) {
+          window.Toast.show({
+            type: 'info',
+            title: 'Zoomed View Applied',
+            body: `Focused into selected interval and active filters`,
+            duration: 2000,
+          });
         }
 
         _close();

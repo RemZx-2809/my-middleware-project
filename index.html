@@ -2069,6 +2069,110 @@
   </div><!-- /main-wrapper -->
 </div><!-- /app -->
 
+<!-- ── Redmine Dispatch Modal (Quick Confirm - Mode A) ──────── -->
+<div id="modal-redmine-dispatch" class="modal-overlay" style="display:none;" aria-modal="true" role="dialog">
+  <div class="modal-backdrop" onclick="window.RedmineDispatchController && RedmineDispatchController.closeModal()"></div>
+  <div class="modal-card modal-card--redmine">
+    <div class="modal-header modal-header--redmine">
+      <div class="modal-title-group">
+        <div class="modal-title-icon" style="background:rgba(167,139,250,0.15); border:1px solid rgba(167,139,250,0.3); color:#c4b5fd;">
+          <i data-lucide="ticket"></i>
+        </div>
+        <div>
+          <h3 class="modal-title" id="rd-modal-heading">Dispatch Incident to Redmine</h3>
+          <p class="modal-subtitle" id="rd-modal-subheading">Review incident payload and add investigation notes before creating ticket</p>
+        </div>
+      </div>
+      <button class="modal-close-btn" onclick="window.RedmineDispatchController && RedmineDispatchController.closeModal()" aria-label="Close modal">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+
+    <div class="modal-body" style="padding:16px 20px; display:flex; flex-direction:column; gap:14px;">
+      <!-- Target Alert Summary Box -->
+      <div class="rd-alert-summary-box" id="rd-alert-summary-box">
+        <!-- Dynamically rendered -->
+      </div>
+
+      <!-- Editable Subject -->
+      <div class="int-field" style="margin-bottom:0;">
+        <label class="int-label" for="rd-modal-subject">
+          <span>Ticket Subject <span class="int-label-required">*</span></span>
+        </label>
+        <div class="int-input-wrap">
+          <span class="int-input-icon"><i data-lucide="file-text"></i></span>
+          <input type="text" id="rd-modal-subject" class="int-input" placeholder="Ticket summary" autocomplete="off" />
+        </div>
+      </div>
+
+      <!-- Priority & Tracker Selection Grid -->
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+        <div class="int-field" style="margin-bottom:0;">
+          <label class="int-label" for="rd-modal-priority">
+            <span>Priority Level</span>
+          </label>
+          <div class="int-input-wrap">
+            <span class="int-input-icon"><i data-lucide="alert-triangle"></i></span>
+            <select id="rd-modal-priority" class="int-input" style="cursor:pointer;">
+              <option value="1">1 - Low</option>
+              <option value="2">2 - Normal</option>
+              <option value="3" selected>3 - High</option>
+              <option value="4">4 - Urgent</option>
+              <option value="5">5 - Immediate</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="int-field" style="margin-bottom:0;">
+          <label class="int-label" for="rd-modal-target-project">
+            <span>Target Project</span>
+          </label>
+          <div class="int-input-wrap">
+            <span class="int-input-icon"><i data-lucide="folder-git-2"></i></span>
+            <input type="text" id="rd-modal-target-project" class="int-input" readonly value="tawaikiar-phoowang" style="color:var(--text-lo); background:rgba(255,255,255,0.02);" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Analyst Investigation Notes -->
+      <div class="int-field" style="margin-bottom:0;">
+        <label class="int-label" for="rd-modal-notes">
+          <span>SOC Analyst Notes / Instructions (Optional)</span>
+          <i data-lucide="info" class="int-info-icon" title="Add notes or mitigation steps for the assignee"></i>
+        </label>
+        <textarea id="rd-modal-notes" class="int-input" rows="3" placeholder="e.g. ตรวจสอบพบพฤติกรรมผิดปกติ รบกวนช่วยตรวจสอบ Log เครื่องต้นทางและดำเนินการแก้ไข" style="resize:vertical; min-height:75px; font-family:inherit; padding:8px 12px;"></textarea>
+      </div>
+    </div>
+
+    <div class="modal-footer" style="padding:14px 20px; background:rgba(0,0,0,0.2); border-top:1px solid rgba(255,255,255,0.06); display:flex; justify-content:flex-end; gap:10px;">
+      <button type="button" class="int-btn int-btn--neutral" onclick="window.RedmineDispatchController && RedmineDispatchController.closeModal()">Cancel</button>
+      <button type="button" id="rd-modal-submit-btn" class="int-btn" style="background:#7c3aed; border:1px solid #8b5cf6; color:#ffffff;" onclick="window.RedmineDispatchController && RedmineDispatchController.submitDispatch()">
+        <i data-lucide="send"></i>
+        <span>Create Redmine Ticket</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Floating Batch Dispatch Toolbar (Discover View) ────── -->
+<div id="discover-batch-toolbar" class="batch-floating-toolbar" style="display:none;">
+  <div class="batch-toolbar-content">
+    <div class="batch-toolbar-info">
+      <span class="batch-pill"><strong id="discover-selected-count">0</strong></span>
+      <span>alerts selected</span>
+    </div>
+    <div class="batch-toolbar-actions">
+      <button type="button" class="batch-btn batch-btn--primary" onclick="DiscoverController.openBatchRedmineModal()">
+        <i data-lucide="ticket"></i>
+        Dispatch Batch to Redmine
+      </button>
+      <button type="button" class="batch-btn batch-btn--ghost" onclick="DiscoverController.clearSelection()">
+        Deselect All
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Toast Container ──────────────────────────────────── -->
 <div id="toast-container" aria-live="polite" aria-label="Notifications"></div>
 

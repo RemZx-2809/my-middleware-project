@@ -20,7 +20,7 @@ const RULES_DIR   = path.join(__dirname, 'rules');
 if (!fs.existsSync(RULES_DIR)) fs.mkdirSync(RULES_DIR, { recursive: true });
 
 const { logAudit, getAuditLogs, clearAuditLogs } = require('./services/auditLog');
-const { testConnection: testRedmineConnection, createIssueFromAlert: createRedmineIssue, syncResolvedIssues: syncRedmineIssues, shouldTriggerTicket, clearDedupForIssue } = require('./services/redmine');
+const { testConnection: testRedmineConnection, createIssueFromAlert: createRedmineIssue, createBatchIssueFromAlerts: createRedmineBatchIssue, syncResolvedIssues: syncRedmineIssues, shouldTriggerTicket, clearDedupForIssue } = require('./services/redmine');
 const { addResolvedRecord, getResolvedHistory, deleteResolvedRecord, deleteMultipleResolvedRecords, clearResolvedHistory, syncClosedIssuesFromRedmine } = require('./services/resolvedHistory');
 
 /* ════════════════════════════════════════════════════════════
@@ -1071,6 +1071,107 @@ const server = http.createServer(async (req, res) => {
     if (!enforceRateLimit(`redmine_sync:${remoteIp}`, 60000, 10)) return;
 
     const result = await syncRedmineIssues(_config);
+    return json(res, result.ok ? 200 : 400, result);
+  }
+
+  /* POST /api/redmine/dispatch — Manual single-ticket dispatch */
+  if (pathname === '/api/redmine/dispatch' && method === 'POST') {
+    if (!enforceRateLimit(`redmine_dispatch:${remoteIp}`, 60000, 30)) return;
+
+    let body;
+    try { body = JSON.parse(await readBody(req)); } catch { return json(res, 400, { error: 'Invalid JSON body' }); }
+
+    let targetAlert = body.alert;
+    const alertId = body.alertId;
+
+    if (!targetAlert && alertId) {
+      for (const cat of Object.values(store)) {
+        const found = cat.find(a => a.id === alertId || a._id === alertId);
+        if (found) { targetAlert = found; break; }
+      }
+    }
+
+    if (!targetAlert) {
+      return json(res, 400, { ok: false, error: 'Target alert payload is required' });
+    }
+
+    const options = {
+      isManual: true,
+      bypassDedup: true,
+      customSubject: body.customSubject || '',
+      priorityId: body.priorityId,
+      customNotes: body.notes || '',
+      userName: req.headers['x-aegis-user'] || 'SOC Analyst',
+    };
+
+    const result = await createRedmineIssue(targetAlert, _config, options);
+    if (result.ok && result.issueId) {
+      const ticketInfo = {
+        id: result.issueId,
+        url: result.issueUrl,
+        subject: result.subject,
+        status: 'Open',
+        dispatchedAt: new Date().toISOString(),
+        dispatchedBy: options.userName,
+      };
+
+      for (const cat of Object.values(store)) {
+        const item = cat.find(a => a.id === targetAlert.id || (targetAlert.id && a.id === targetAlert.id));
+        if (item) {
+          item.redmine_ticket = ticketInfo;
+        }
+      }
+      _saveStore(true);
+      sseBroadcast('ticket-dispatched', { alertId: targetAlert.id, ticket: ticketInfo });
+    }
+
+    return json(res, result.ok ? 200 : 400, result);
+  }
+
+  /* POST /api/redmine/batch-dispatch — Manual multi-alert batch ticket dispatch */
+  if (pathname === '/api/redmine/batch-dispatch' && method === 'POST') {
+    if (!enforceRateLimit(`redmine_batch:${remoteIp}`, 60000, 15)) return;
+
+    let body;
+    try { body = JSON.parse(await readBody(req)); } catch { return json(res, 400, { error: 'Invalid JSON body' }); }
+
+    const targetAlerts = Array.isArray(body.alerts) ? body.alerts : [];
+    if (targetAlerts.length === 0) {
+      return json(res, 400, { ok: false, error: 'No alerts provided for batch ticket' });
+    }
+
+    const options = {
+      isManual: true,
+      customSubject: body.customSubject || '',
+      priorityId: body.priorityId,
+      customNotes: body.notes || '',
+      userName: req.headers['x-aegis-user'] || 'SOC Analyst',
+    };
+
+    const result = await createRedmineBatchIssue(targetAlerts, options, _config);
+    if (result.ok && result.issueId) {
+      const ticketInfo = {
+        id: result.issueId,
+        url: result.issueUrl,
+        subject: result.subject,
+        status: 'Open',
+        batchCount: targetAlerts.length,
+        dispatchedAt: new Date().toISOString(),
+        dispatchedBy: options.userName,
+      };
+
+      const targetIds = new Set(targetAlerts.map(a => a.id).filter(Boolean));
+      for (const cat of Object.values(store)) {
+        for (const item of cat) {
+          if (targetIds.has(item.id)) {
+            item.redmine_ticket = ticketInfo;
+          }
+        }
+      }
+      _saveStore(true);
+      sseBroadcast('batch-ticket-dispatched', { count: targetAlerts.length, ticket: ticketInfo });
+    }
+
     return json(res, result.ok ? 200 : 400, result);
   }
 

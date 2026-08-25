@@ -173,9 +173,9 @@ async function testConnection({ baseUrl, apiKey }) {
 }
 
 /**
- * 2. Auto-create Redmine Issue with Intelligent Deduplication
+ * 2. Create Redmine Issue (Supports Auto & Manual Dispatch)
  */
-async function createIssueFromAlert(alert, config = {}) {
+async function createIssueFromAlert(alert, config = {}, options = {}) {
   const baseUrl = config.redmineUrl;
   const apiKey  = config.redmineApiKey;
   const project = config.redmineProject;
@@ -197,12 +197,12 @@ async function createIssueFromAlert(alert, config = {}) {
   const dstip = alert?.data?.dstip || alert?.destination?.dstip || 'N/A';
   const fullLog = alert?.full_log || JSON.stringify(alert?.data || {}, null, 2);
 
-  // ── DEDUPLICATION CHECK ─────────────────────────────────────
+  // ── DEDUPLICATION CHECK (Only for auto-dispatch unless bypassDedup is true) ──
   const fingerprint = getAlertFingerprint(alert);
-  const dedupHours  = parseFloat(config.redmineDedupHours ?? '24'); // default 24 hours dedup window
+  const dedupHours  = parseFloat(config.redmineDedupHours ?? '24');
   const existing    = _dedupCache.get(fingerprint);
 
-  if (dedupHours > 0 && existing) {
+  if (!options.bypassDedup && dedupHours > 0 && existing) {
     const elapsedMs = Date.now() - existing.timestamp;
     const windowMs  = dedupHours * 3600 * 1000;
 
@@ -220,19 +220,30 @@ async function createIssueFromAlert(alert, config = {}) {
   }
 
   // Map Wazuh severity to Redmine priority
-  // Redmine standard priorities: 1: Low, 2: Normal, 3: High, 4: Urgent, 5: Immediate
-  let priorityId = 3; // High
-  if (level >= 14) priorityId = 5; // Immediate
-  else if (level >= 12) priorityId = 4; // Urgent
-  else if (level >= 7)  priorityId = 3; // High
-  else if (level >= 4)  priorityId = 2; // Normal
-  else priorityId = 1; // Low
+  let defaultPriority = 3; // High
+  if (level >= 14) defaultPriority = 5; // Immediate
+  else if (level >= 12) defaultPriority = 4; // Urgent
+  else if (level >= 7)  defaultPriority = 3; // High
+  else if (level >= 4)  defaultPriority = 2; // Normal
+  else defaultPriority = 1; // Low
 
-  const subject = `[L${level}] ${desc} on ${targetDevice}${filePath ? ` (${filePath})` : ''}`.slice(0, 255);
+  const priorityId = options.priorityId ? parseInt(options.priorityId, 10) : defaultPriority;
+  const defaultSubject = `[L${level}] ${desc} on ${targetDevice}${filePath ? ` (${filePath})` : ''}`.slice(0, 255);
+  const subject = (options.customSubject || defaultSubject).slice(0, 255);
+
+  const notesSection = options.customNotes ? [
+    `h3. 📝 SOC Analyst Investigation Notes`,
+    options.customNotes,
+    ``,
+  ] : [];
+
+  const isManual = !!options.isManual;
+  const triggerLabel = isManual ? `Manual Dispatch by SOC Analyst (${options.userName || 'Analyst'})` : `Automatic Detection Pipeline`;
 
   const descriptionBody = [
     `h2. Security Incident Report (Aegis SOC Middleware)`,
     ``,
+    `* *Trigger Mode:* ${triggerLabel}`,
     `* *Rule ID:* ${ruleId || 'N/A'}`,
     `* *Rule Description:* ${desc}`,
     `* *Severity Level:* Level ${level}`,
@@ -243,12 +254,13 @@ async function createIssueFromAlert(alert, config = {}) {
     `* *Destination IP:* ${dstip}`,
     `* *Timestamp:* ${alert?.timestamp || alert?.receivedAt || new Date().toISOString()}`,
     ``,
+    ...notesSection,
     `h3. Full Alert Payload`,
     `<pre>`,
     fullLog,
     `</pre>`,
     ``,
-    `_Generated automatically by Aegis SOC Middleware with Deduplication Protection._`
+    `_Dispatched via Aegis SOC Middleware._`
   ].join('\n');
 
   const payload = {
@@ -268,6 +280,154 @@ async function createIssueFromAlert(alert, config = {}) {
       apiKey,
       body: payload,
     });
+
+    const issue = res.data?.issue;
+    const issueId = issue?.id;
+    const issueUrl = `${baseUrl.replace(/\/+$/, '')}/issues/${issueId}`;
+
+    // Record in deduplication cache
+    _dedupCache.set(fingerprint, {
+      timestamp: Date.now(),
+      issueId,
+      count: 1,
+      lastSubject: subject,
+    });
+
+    // Log to Audit Log
+    await logAudit({
+      user: options.userName || (isManual ? 'analyst-manual' : 'aegis-auto-ticketer'),
+      action: isManual ? 'redmine_manual_dispatch' : 'redmine_issue_created',
+      filename: `Redmine Issue #${issueId}`,
+      before: `Alert L${level} (${ruleId || desc}): Device ${targetDevice}`,
+      after: `Created Issue #${issueId}: ${subject}\nURL: ${issueUrl}`,
+    }).catch(() => {});
+
+    console.log(`[Redmine] ${isManual ? 'Manually' : 'Auto'} created Issue #${issueId} for ${targetDevice} (${subject})`);
+
+    return {
+      ok: true,
+      issueId,
+      issueUrl,
+      subject,
+    };
+  } catch (err) {
+    console.error('[Redmine] Failed to create issue:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * 2b. Batch Dispatch Multiple Alerts into a Single Redmine Issue
+ */
+async function createBatchIssueFromAlerts(alerts = [], options = {}, config = {}) {
+  const baseUrl = config.redmineUrl;
+  const apiKey  = config.redmineApiKey;
+  const project = config.redmineProject;
+  const tracker = config.redmineTrackerId || 1;
+
+  if (!baseUrl || !apiKey || !project) {
+    return { ok: false, error: 'Redmine is not configured' };
+  }
+  if (!Array.isArray(alerts) || alerts.length === 0) {
+    return { ok: false, error: 'No alerts provided for batch ticket' };
+  }
+
+  const highestLevel = Math.max(...alerts.map(a => parseInt(a?.rule?.level ?? 0, 10)));
+  const deviceSet = new Set(alerts.map(a => a?.agent?.name || a?.data?.devname || 'device'));
+  const deviceList = Array.from(deviceSet).slice(0, 3).join(', ') + (deviceSet.size > 3 ? ` (+${deviceSet.size - 3} more)` : '');
+
+  let defaultPriority = 3;
+  if (highestLevel >= 14) defaultPriority = 5;
+  else if (highestLevel >= 12) defaultPriority = 4;
+  else if (highestLevel >= 7)  defaultPriority = 3;
+  else if (highestLevel >= 4)  defaultPriority = 2;
+  else defaultPriority = 1;
+
+  const priorityId = options.priorityId ? parseInt(options.priorityId, 10) : defaultPriority;
+  const defaultSubject = `[Batch SOC] ${alerts.length} Incidents (Max L${highestLevel}) on ${deviceList}`;
+  const subject = (options.customSubject || defaultSubject).slice(0, 255);
+
+  const notesSection = options.customNotes ? [
+    `h3. 📝 SOC Analyst Investigation Notes`,
+    options.customNotes,
+    ``,
+  ] : [];
+
+  const rows = alerts.map((a, idx) => {
+    const lvl = a?.rule?.level || 0;
+    const desc = a?.rule?.description || 'N/A';
+    const rid = a?.rule?.id || '-';
+    const host = a?.agent?.name || a?.data?.devname || '-';
+    const ts = a?.timestamp || a?.receivedAt || '-';
+    return `| ${idx + 1} | Level ${lvl} | ${rid} | ${desc} | ${host} | ${ts} |`;
+  }).join('\n');
+
+  const descriptionBody = [
+    `h2. Batch Security Incidents Consolidated Report (Aegis SOC)`,
+    ``,
+    `* *Total Consolidated Alerts:* ${alerts.length}`,
+    `* *Highest Severity:* Level ${highestLevel}`,
+    `* *Affected Endpoints:* ${Array.from(deviceSet).join(', ')}`,
+    `* *Dispatched By:* ${options.userName || 'SOC Analyst'}`,
+    `* *Dispatch Time:* ${new Date().toISOString()}`,
+    ``,
+    ...notesSection,
+    `h3. 📋 Incident Event Breakdown`,
+    `| # | Level | Rule ID | Description | Host | Timestamp |`,
+    rows,
+    ``,
+    `h3. Consolidated Raw Payloads`,
+    `<pre>`,
+    JSON.stringify(alerts.map(a => ({ id: a.id, rule: a.rule, agent: a.agent, data: a.data, timestamp: a.timestamp })), null, 2),
+    `</pre>`,
+    ``,
+    `_Consolidated Batch Dispatch generated via Aegis SOC Middleware._`
+  ].join('\n');
+
+  const payload = {
+    issue: {
+      project_id: project,
+      tracker_id: tracker,
+      priority_id: priorityId,
+      subject,
+      description: descriptionBody,
+    },
+  };
+
+  try {
+    const res = await _request('issues.json', {
+      method: 'POST',
+      baseUrl,
+      apiKey,
+      body: payload,
+    });
+
+    const issue = res.data?.issue;
+    const issueId = issue?.id;
+    const issueUrl = `${baseUrl.replace(/\/+$/, '')}/issues/${issueId}`;
+
+    await logAudit({
+      user: options.userName || 'analyst-manual-batch',
+      action: 'redmine_batch_dispatch',
+      filename: `Redmine Issue #${issueId}`,
+      before: `Batch selected ${alerts.length} alerts (Max Level ${highestLevel})`,
+      after: `Created Batch Issue #${issueId}: ${subject}\nURL: ${issueUrl}`,
+    }).catch(() => {});
+
+    console.log(`[Redmine] Batch created Issue #${issueId} for ${alerts.length} alerts`);
+
+    return {
+      ok: true,
+      issueId,
+      issueUrl,
+      subject,
+      count: alerts.length,
+    };
+  } catch (err) {
+    console.error('[Redmine] Failed to create batch issue:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
 
     const issue = res.data?.issue;
     const issueId = issue?.id;
@@ -382,6 +542,7 @@ function clearDedupCache() {
 module.exports = {
   testConnection,
   createIssueFromAlert,
+  createBatchIssueFromAlerts,
   syncResolvedIssues,
   shouldTriggerTicket,
   clearDedupForIssue,

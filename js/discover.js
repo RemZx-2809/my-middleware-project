@@ -17,7 +17,7 @@ const DiscoverController = (() => {
   let _allLogs = [];
   let _activeFilters = {
     search: '',
-    fieldFilters: { 'agent.name': 'wazuh-server' }, // default active filter pill like screenshot
+    fieldFilters: {},
   };
 
   let _pagination = {
@@ -31,6 +31,8 @@ const DiscoverController = (() => {
 
   let _expandedRowId = null;
   let _activeDrawerTab = {}; // map of row index -> 'table' | 'json'
+  let _selectedLogIds = new Set();
+  let _discoverZoomRange = null; // Local zoom range for Discover only
 
   function init() {
     _bindEvents();
@@ -251,8 +253,18 @@ const DiscoverController = (() => {
   function getFilteredLogs() {
     let logs = _allLogs;
 
-    // Time Range Filter
-    if (window.TimeRangePicker && window.TimeRangePicker.getRange) {
+    // Discover-specific Zoom Range (Isolated to Discover, doesn't modify Dashboard)
+    if (_discoverZoomRange && _discoverZoomRange.from && _discoverZoomRange.to) {
+      const fromMs = _discoverZoomRange.from.getTime();
+      const toMs = _discoverZoomRange.to.getTime();
+      logs = logs.filter(a => {
+        const ts = a.timestamp || a.receivedAt || a['@timestamp'];
+        if (!ts) return true;
+        const t = new Date(ts).getTime();
+        return !isNaN(t) && t >= fromMs && t <= toMs;
+      });
+    } else if (window.TimeRangePicker && window.TimeRangePicker.getRange) {
+      // Global Time Range Filter
       const r = window.TimeRangePicker.getRange();
       if (r && r.from && r.to) {
         const fromMs = r.from.getTime();
@@ -520,7 +532,10 @@ const DiscoverController = (() => {
       let fromStr = '';
       let toStr   = '';
 
-      if (window.TimeRangePicker && window.TimeRangePicker.getRange) {
+      if (_discoverZoomRange && _discoverZoomRange.from && _discoverZoomRange.to) {
+        fromStr = _formatKibanaDate(_discoverZoomRange.from);
+        toStr   = _formatKibanaDate(_discoverZoomRange.to);
+      } else if (window.TimeRangePicker && window.TimeRangePicker.getRange) {
         const r = window.TimeRangePicker.getRange();
         if (r && r.from && r.to) {
           fromStr = _formatKibanaDate(r.from);
@@ -607,11 +622,23 @@ const DiscoverController = (() => {
     const pagNav = document.getElementById('discover-pag-nav');
     if (!tbody) return;
 
+    const logs = getSortedLogs(getFilteredLogs());
+    const totalCount = logs.length;
+    const { currentPage, rowsPerPage } = _pagination;
+    const totalPages = Math.max(1, Math.ceil(totalCount / rowsPerPage));
+
+    const startIdx = (currentPage - 1) * rowsPerPage;
+    const pageLogs = logs.slice(startIdx, startIdx + rowsPerPage);
+
     // Render Table Headers dynamically according to _visibleColumns
     if (thead) {
+      const allChecked = pageLogs.length > 0 && pageLogs.every(l => _selectedLogIds.has(String(l.id || l._id || l.timestamp)));
       thead.innerHTML = `
         <tr>
-          <th style="width: 44px; text-align: center;"></th>
+          <th style="width: 36px; text-align: center;">
+            <input type="checkbox" id="discover-select-all" class="fh-custom-checkbox" ${allChecked ? 'checked' : ''} onchange="DiscoverController.toggleSelectAll(this.checked)" title="Select all on this page" />
+          </th>
+          <th style="width: 36px; text-align: center;"></th>
           ${_visibleColumns.map(col => {
             const isSorted = _sortConfig.field === col;
             const arrow = isSorted ? (_sortConfig.direction === 'asc' ? ' &uarr;' : ' &darr;') : '';
@@ -623,22 +650,15 @@ const DiscoverController = (() => {
               </th>
             `;
           }).join('')}
+          <th style="width: 110px; text-align: center;">Redmine</th>
         </tr>
       `;
     }
 
-    const logs = getSortedLogs(getFilteredLogs());
-    const totalCount = logs.length;
-    const { currentPage, rowsPerPage } = _pagination;
-    const totalPages = Math.max(1, Math.ceil(totalCount / rowsPerPage));
-
-    const startIdx = (currentPage - 1) * rowsPerPage;
-    const pageLogs = logs.slice(startIdx, startIdx + rowsPerPage);
-
     if (pageLogs.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="${_visibleColumns.length + 1}" style="text-align:center; padding: 32px; color: var(--text-lo);">
+          <td colspan="${_visibleColumns.length + 3}" style="text-align:center; padding: 32px; color: var(--text-lo);">
             No matching log entries found for current filter.
           </td>
         </tr>
@@ -651,6 +671,8 @@ const DiscoverController = (() => {
     pageLogs.forEach((log, idx) => {
       const globalIdx = startIdx + idx;
       const isExpanded = _expandedRowId === globalIdx;
+      const logId = String(log.id || log._id || log.timestamp || globalIdx);
+      const isSelected = _selectedLogIds.has(logId);
 
       let cellsHtml = '';
       _visibleColumns.forEach(col => {
@@ -678,8 +700,15 @@ const DiscoverController = (() => {
         }
       });
 
+      const ticketBadge = log.redmine_ticket
+        ? `<a href="${log.redmine_ticket.url}" target="_blank" class="redmine-ticket-badge" title="Ticket #${log.redmine_ticket.id} (${log.redmine_ticket.status || 'Open'})" onclick="event.stopPropagation()">🎟️ #${log.redmine_ticket.id}</a>`
+        : `<button class="btn-dispatch-ticket" title="Dispatch incident to Redmine" onclick="event.stopPropagation(); window.RedmineDispatchController && RedmineDispatchController.openSingleModal(DiscoverController.getLogById('${logId}'))"><i data-lucide="ticket"></i> Dispatch</button>`;
+
       rowsHtml += `
-        <tr class="discover-row ${isExpanded ? 'doc-row--active' : ''}" id="doc-row-${globalIdx}">
+        <tr class="discover-row ${isExpanded ? 'doc-row--active' : ''} ${isSelected ? 'row--selected' : ''}" id="doc-row-${globalIdx}">
+          <td style="width: 36px; text-align: center;" onclick="event.stopPropagation()">
+            <input type="checkbox" class="log-row-checkbox fh-custom-checkbox" value="${logId}" ${isSelected ? 'checked' : ''} onchange="DiscoverController.toggleSelectRow('${logId}', this.checked)" />
+          </td>
           <td style="width: 36px; text-align: center;">
             <button class="btn-expand-doc ${isExpanded ? 'open' : ''}"
                     title="Inspect document"
@@ -693,11 +722,15 @@ const DiscoverController = (() => {
             </button>
           </td>
           ${cellsHtml}
+          <td style="text-align: center;" onclick="event.stopPropagation()">
+            ${ticketBadge}
+          </td>
         </tr>
       `;
     });
 
     tbody.innerHTML = rowsHtml;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 
     // Render Pagination Buttons
     if (pagNav) {
@@ -859,6 +892,9 @@ const DiscoverController = (() => {
     if (path === 'manager.name') return log?.manager?.name || 'wazuh-server';
     if (path === 'location') return log?.location || '/var/log/messages';
     if (path === 'decoder.name') return log?.decoder?.name || 'syslog';
+    if (path === 'syscheck.path' || path === 'file' || path === 'targetFile' || path === 'data.path') {
+      return log?.syscheck?.path || log?.data?.path || log?.filename || log?.syscheck?.file || '—';
+    }
     return log[path] || '—';
   }
 
@@ -2507,9 +2543,14 @@ const DiscoverController = (() => {
       <div class="dsp-resize-handle" id="dsp-resize-handle" title="Drag left/right to resize"></div>
       <div class="dsp-header">
         <span class="dsp-title">Document Details</span>
-        <button class="dsp-close-btn" id="dsp-close-btn" title="Close" onclick="DiscoverController.closeDocSidePanel()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+        <div style="display:flex; align-items:center; gap:8px;">
+          ${log.redmine_ticket
+            ? `<a href="${log.redmine_ticket.url}" target="_blank" class="redmine-ticket-badge" style="font-size:12px; padding:3px 8px;" title="View Ticket on Redmine">🎟️ #${log.redmine_ticket.id}</a>`
+            : `<button class="btn-dispatch-ticket" style="padding:4px 10px; font-size:12px;" onclick="window.RedmineDispatchController && RedmineDispatchController.openSingleModal(DiscoverController.getLogByGlobalIdx(${globalIdx}))"><i data-lucide="ticket"></i> Dispatch to Redmine</button>`}
+          <button class="dsp-close-btn" id="dsp-close-btn" title="Close" onclick="DiscoverController.closeDocSidePanel()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
       </div>
       <div class="dsp-tabs">
         <button class="dsp-tab-btn ${activeTab === 'table' ? 'active' : ''}" data-tab="table"
@@ -2651,29 +2692,30 @@ const DiscoverController = (() => {
 
   function zoomToBucket(startMs, endMs) {
     hideBarTooltip();
-    // Strictly lock zoom to the exact boundary of the clicked bar
     const fromDate = new Date(startMs);
     const toDate = new Date(endMs);
 
+    _discoverZoomRange = { from: fromDate, to: toDate };
+    _pagination.currentPage = 1;
+    renderAll();
+
     const timeLabel = `${fromDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'})} → ${toDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'})}`;
-
-    if (window.TimeRangePicker && window.TimeRangePicker.setAbsolute) {
-      window.TimeRangePicker.setAbsolute(fromDate, toDate, `🔍 ${timeLabel}`);
-    }
-
     if (window.Toast) {
       window.Toast.show({
         type: 'info',
-        title: 'Zoomed View',
-        body: `Locked to bar interval: ${timeLabel}`,
-        duration: 2000,
+        title: 'Discover Zoomed',
+        body: `Locked to interval: ${timeLabel}`,
+        duration: 1500,
       });
     }
   }
 
   function zoomIn() {
     let from, to;
-    if (window.TimeRangePicker && window.TimeRangePicker.getRange) {
+    if (_discoverZoomRange && _discoverZoomRange.from && _discoverZoomRange.to) {
+      from = _discoverZoomRange.from.getTime();
+      to = _discoverZoomRange.to.getTime();
+    } else if (window.TimeRangePicker && window.TimeRangePicker.getRange) {
       const r = window.TimeRangePicker.getRange();
       if (r && r.from && r.to) {
         from = r.from.getTime();
@@ -2696,14 +2738,17 @@ const DiscoverController = (() => {
     const newFrom = new Date(center - newHalf);
     const newTo = new Date(center + newHalf);
 
-    if (window.TimeRangePicker && window.TimeRangePicker.setAbsolute) {
-      window.TimeRangePicker.setAbsolute(newFrom, newTo, `🔍 Zoom In`);
-    }
+    _discoverZoomRange = { from: newFrom, to: newTo };
+    _pagination.currentPage = 1;
+    renderAll();
   }
 
   function zoomOut() {
     let from, to;
-    if (window.TimeRangePicker && window.TimeRangePicker.getRange) {
+    if (_discoverZoomRange && _discoverZoomRange.from && _discoverZoomRange.to) {
+      from = _discoverZoomRange.from.getTime();
+      to = _discoverZoomRange.to.getTime();
+    } else if (window.TimeRangePicker && window.TimeRangePicker.getRange) {
       const r = window.TimeRangePicker.getRange();
       if (r && r.from && r.to) {
         from = r.from.getTime();
@@ -2722,14 +2767,13 @@ const DiscoverController = (() => {
     const newFrom = new Date(center - newHalf);
     const newTo = new Date(Math.min(Date.now(), center + newHalf));
 
-    if (window.TimeRangePicker && window.TimeRangePicker.setAbsolute) {
-      window.TimeRangePicker.setAbsolute(newFrom, newTo, `🔍 Zoom Out`);
-    }
+    _discoverZoomRange = { from: newFrom, to: newTo };
+    _pagination.currentPage = 1;
+    renderAll();
   }
 
   function zoomFitHits() {
-    const logs = getFilteredLogs();
-    const times = logs.map(l => new Date(l.timestamp || l.receivedAt).getTime()).filter(t => !isNaN(t)).sort((a, b) => a - b);
+    const times = _allLogs.map(l => new Date(l.timestamp || l.receivedAt).getTime()).filter(t => !isNaN(t)).sort((a, b) => a - b);
     if (times.length === 0) {
       if (window.Toast) window.Toast.show({ type: 'info', title: 'Fit Hits', body: 'No events found to fit view', duration: 1500 });
       return;
@@ -2737,26 +2781,97 @@ const DiscoverController = (() => {
 
     const minT = times[0];
     const maxT = times[times.length - 1];
-    
-    // Fit precisely within the span of actual events
+
     const newFrom = new Date(minT);
     const newTo = new Date(maxT > minT ? maxT : minT + 60000);
 
-    if (window.TimeRangePicker && window.TimeRangePicker.setAbsolute) {
-      window.TimeRangePicker.setAbsolute(newFrom, newTo, `🎯 Fit: ${logs.length} Events`);
-    }
+    _discoverZoomRange = { from: newFrom, to: newTo };
+    _pagination.currentPage = 1;
+    renderAll();
+
     if (window.Toast) {
-      window.Toast.show({ type: 'success', title: 'Fit to Hits', body: `Zoomed precisely to all ${logs.length} events`, duration: 2000 });
+      window.Toast.show({ type: 'success', title: 'Fit to Hits', body: `Zoomed to all ${_allLogs.length} events in Discover`, duration: 1500 });
     }
   }
 
   function resetZoom() {
-    if (window.TimeRangePicker && window.TimeRangePicker.reset) {
-      window.TimeRangePicker.reset();
-    }
+    _discoverZoomRange = null;
+    _pagination.currentPage = 1;
+    renderAll();
+
     if (window.Toast) {
-      window.Toast.show({ type: 'info', title: 'Zoom Reset', body: 'Restored default full view', duration: 1500 });
+      window.Toast.show({ type: 'info', title: 'Discover Reset', body: 'Restored full view in Discover', duration: 1500 });
     }
+  }
+
+  function toggleSelectAll(checked) {
+    const logs = getSortedLogs(getFilteredLogs());
+    const { currentPage, rowsPerPage } = _pagination;
+    const startIdx = (currentPage - 1) * rowsPerPage;
+    const pageLogs = logs.slice(startIdx, startIdx + rowsPerPage);
+
+    pageLogs.forEach((l, idx) => {
+      const id = String(l.id || l._id || l.timestamp || (startIdx + idx));
+      if (checked) _selectedLogIds.add(id);
+      else _selectedLogIds.delete(id);
+    });
+    updateBatchToolbar();
+    renderTableAndPagination();
+  }
+
+  function toggleSelectRow(id, checked) {
+    if (checked) _selectedLogIds.add(String(id));
+    else _selectedLogIds.delete(String(id));
+    updateBatchToolbar();
+
+    // Update row visual class
+    const chk = document.querySelector(`.log-row-checkbox[value="${id}"]`);
+    if (chk) {
+      const row = chk.closest('tr');
+      if (row) row.classList.toggle('row--selected', checked);
+    }
+  }
+
+  function clearSelection() {
+    _selectedLogIds.clear();
+    updateBatchToolbar();
+    renderTableAndPagination();
+  }
+
+  function updateBatchToolbar() {
+    const toolbar = document.getElementById('discover-batch-toolbar');
+    const countEl = document.getElementById('discover-selected-count');
+    if (!toolbar) return;
+
+    if (_selectedLogIds.size > 0) {
+      toolbar.style.display = 'block';
+      if (countEl) countEl.textContent = _selectedLogIds.size;
+    } else {
+      toolbar.style.display = 'none';
+    }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+
+  function openBatchRedmineModal() {
+    const all = getFilteredLogs();
+    const selectedAlerts = all.filter((l, idx) => _selectedLogIds.has(String(l.id || l._id || l.timestamp || idx)));
+    if (selectedAlerts.length === 0) {
+      if (window.Toast) window.Toast.show({ type: 'warn', title: 'No Alerts Selected', body: 'Please select at least 1 alert to dispatch', duration: 2000 });
+      return;
+    }
+    if (window.RedmineDispatchController) {
+      window.RedmineDispatchController.openBatchModal(selectedAlerts);
+    }
+  }
+
+  function getLogById(id) {
+    const all = getFilteredLogs();
+    return all.find((l, idx) => String(l.id || l._id || l.timestamp || idx) === String(id)) || null;
+  }
+
+  function getLogByGlobalIdx(idx) {
+    const logs = getSortedLogs(getFilteredLogs());
+    return logs[idx] || null;
   }
 
   function _escapeHtml(str) {
@@ -2812,6 +2927,12 @@ const DiscoverController = (() => {
     zoomOut,
     zoomFitHits,
     resetZoom,
+    toggleSelectAll,
+    toggleSelectRow,
+    clearSelection,
+    openBatchRedmineModal,
+    getLogById,
+    getLogByGlobalIdx,
     toggleDatesPopover,
     closeDatesModal,
     toggleTimeRangePopover,

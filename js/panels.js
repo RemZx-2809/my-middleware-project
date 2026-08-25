@@ -378,15 +378,23 @@ const PanelManager = (() => {
     const mitre  = _esc(alert.rule?.mitre?.technique?.[0] ?? alert.rule?.groups?.[0] ?? '');
     const sub    = [agent, mitre].filter(Boolean).join(' · ');
     const time   = _relTime(alert.timestamp ?? alert.receivedAt);
+    const alertId = alert.id || alert._id || '';
 
-    return `<div class="data-row">
+    const ticketBadge = alert.redmine_ticket
+      ? `<a href="${alert.redmine_ticket.url}" target="_blank" class="redmine-ticket-badge" onclick="event.stopPropagation()" title="View Ticket #${alert.redmine_ticket.id}">🎟️ #${alert.redmine_ticket.id}</a>`
+      : `<button class="btn-dispatch-ticket" style="padding:2px 6px; font-size:10px;" onclick="event.stopPropagation(); window.RedmineDispatchController && RedmineDispatchController.openSingleModal(PanelManager.getAlertById('${alertId}'))" title="Dispatch to Redmine"><i data-lucide="ticket" style="width:11px;height:11px;"></i></button>`;
+
+    return `<div class="data-row" style="cursor:pointer;" onclick="window.RedmineDispatchController && RedmineDispatchController.openSingleModal(PanelManager.getAlertById('${alertId}'))">
   <div class="row-dot row-dot--${cls}"></div>
   <div class="row-body">
     <span class="row-title">${desc}</span>
     <span class="row-sub">${sub}</span>
   </div>
-  <span class="row-chip row-chip--${cls}">L${level}</span>
-  <span class="row-time">${time}</span>
+  <div style="display:flex; align-items:center; gap:6px;">
+    ${ticketBadge}
+    <span class="row-chip row-chip--${cls}">L${level}</span>
+    <span class="row-time">${time}</span>
+  </div>
 </div>`;
   }
 
@@ -466,16 +474,32 @@ const PanelManager = (() => {
     const agent  = _esc(alert.agent?.name ?? '');
     const sub    = [vtDesc || url, agent].filter(Boolean).join(' · ');
     const time   = _relTime(alert.timestamp ?? alert.receivedAt);
+    const alertId = alert.id || alert._id || '';
 
-    return `<div class="data-row">
+    const ticketBadge = alert.redmine_ticket
+      ? `<a href="${alert.redmine_ticket.url}" target="_blank" class="redmine-ticket-badge" onclick="event.stopPropagation()" title="View Ticket #${alert.redmine_ticket.id}">🎟️ #${alert.redmine_ticket.id}</a>`
+      : `<button class="btn-dispatch-ticket" style="padding:2px 6px; font-size:10px;" onclick="event.stopPropagation(); window.RedmineDispatchController && RedmineDispatchController.openSingleModal(PanelManager.getAlertById('${alertId}'))" title="Dispatch to Redmine"><i data-lucide="ticket" style="width:11px;height:11px;"></i></button>`;
+
+    return `<div class="data-row" style="cursor:pointer;" onclick="window.RedmineDispatchController && RedmineDispatchController.openSingleModal(PanelManager.getAlertById('${alertId}'))">
   <div class="row-dot row-dot--${cls}"></div>
   <div class="row-body">
     <span class="row-title">${desc}</span>
     <span class="row-sub">${sub}</span>
   </div>
-  <span class="row-chip row-chip--${cls}">L${level}</span>
-  <span class="row-time">${time}</span>
+  <div style="display:flex; align-items:center; gap:6px;">
+    ${ticketBadge}
+    <span class="row-chip row-chip--${cls}">L${level}</span>
+    <span class="row-time">${time}</span>
+  </div>
 </div>`;
+  }
+
+  function getAlertById(id) {
+    for (const list of Object.values(_storedAlertsByUseCase)) {
+      const found = list.find(a => String(a.id || a._id) === String(id));
+      if (found) return found;
+    }
+    return null;
   }
 
   return {
@@ -489,6 +513,7 @@ const PanelManager = (() => {
     setFilter,
     clearFilter,
     reRenderAllPanels,
+    getAlertById,
   };
 })();
 

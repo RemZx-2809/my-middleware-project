@@ -317,4 +317,246 @@ const RedmineController = (() => {
   return { init, loadConfig, testConnection, syncIssues, saveConfig, updateTopStatusBadge };
 })();
 
+/* ══════════════════════════════════════════════════════════════
+   REDMINE DISPATCH CONTROLLER (Manual & Batch Mode A)
+══════════════════════════════════════════════════════════════ */
+const RedmineDispatchController = (() => {
+  let _mode = 'single'; // 'single' | 'batch'
+  let _activeAlert = null;
+  let _activeAlerts = [];
+
+  function openSingleModal(alert) {
+    if (!alert) return;
+    _mode = 'single';
+    _activeAlert = alert;
+    _activeAlerts = [alert];
+
+    const modal = document.getElementById('modal-redmine-dispatch');
+    const heading = document.getElementById('rd-modal-heading');
+    const subheading = document.getElementById('rd-modal-subheading');
+    const summaryBox = document.getElementById('rd-alert-summary-box');
+    const subjectInput = document.getElementById('rd-modal-subject');
+    const prioritySelect = document.getElementById('rd-modal-priority');
+    const notesInput = document.getElementById('rd-modal-notes');
+
+    if (!modal) return;
+
+    const level = alert?.rule?.level || 0;
+    const ruleId = alert?.rule?.id || 'N/A';
+    const desc = alert?.rule?.description || 'Security Incident';
+    const host = alert?.agent?.name || alert?.data?.devname || 'Unknown Endpoint';
+    const filePath = alert?.syscheck?.path || alert?.data?.path || '';
+    const ts = alert?.timestamp || alert?.receivedAt || new Date().toISOString();
+
+    heading.textContent = 'Dispatch Incident to Redmine';
+    subheading.textContent = 'Review incident payload and add investigation notes before creating ticket';
+
+    let levelBadgeColor = '#94a3b8';
+    if (level >= 12) levelBadgeColor = '#f43f5e';
+    else if (level >= 8) levelBadgeColor = '#f97316';
+    else if (level >= 4) levelBadgeColor = '#eab308';
+
+    summaryBox.innerHTML = `
+      <div class="rd-alert-summary-header">
+        <span class="rd-alert-summary-title">${_escapeHtml(desc)}</span>
+        <span style="background:${levelBadgeColor}22; color:${levelBadgeColor}; border:1px solid ${levelBadgeColor}66; border-radius:4px; padding:2px 6px; font-size:11px; font-weight:700;">Level ${level}</span>
+      </div>
+      <div class="rd-alert-summary-meta">
+        <span><i data-lucide="shield" style="width:12px;height:12px;"></i> Rule #${ruleId}</span>
+        <span><i data-lucide="server" style="width:12px;height:12px;"></i> ${host}</span>
+        ${filePath ? `<span><i data-lucide="file" style="width:12px;height:12px;"></i> ${_escapeHtml(filePath)}</span>` : ''}
+        <span><i data-lucide="clock" style="width:12px;height:12px;"></i> ${new Date(ts).toLocaleTimeString()}</span>
+      </div>
+    `;
+
+    // Default subject
+    subjectInput.value = `[L${level}] ${desc} on ${host}${filePath ? ` (${filePath})` : ''}`.slice(0, 255);
+
+    // Priority mapping
+    let defaultPriority = '3';
+    if (level >= 14) defaultPriority = '5';
+    else if (level >= 12) defaultPriority = '4';
+    else if (level >= 7)  defaultPriority = '3';
+    else if (level >= 4)  defaultPriority = '2';
+    else defaultPriority = '1';
+
+    if (prioritySelect) prioritySelect.value = defaultPriority;
+    if (notesInput) notesInput.value = '';
+
+    modal.style.display = 'flex';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    setTimeout(() => subjectInput?.focus(), 50);
+  }
+
+  function openBatchModal(alerts) {
+    if (!Array.isArray(alerts) || alerts.length === 0) return;
+    _mode = 'batch';
+    _activeAlerts = alerts;
+    _activeAlert = null;
+
+    const modal = document.getElementById('modal-redmine-dispatch');
+    const heading = document.getElementById('rd-modal-heading');
+    const subheading = document.getElementById('rd-modal-subheading');
+    const summaryBox = document.getElementById('rd-alert-summary-box');
+    const subjectInput = document.getElementById('rd-modal-subject');
+    const prioritySelect = document.getElementById('rd-modal-priority');
+    const notesInput = document.getElementById('rd-modal-notes');
+
+    if (!modal) return;
+
+    const highestLevel = Math.max(...alerts.map(a => parseInt(a?.rule?.level ?? 0, 10)));
+    const deviceSet = new Set(alerts.map(a => a?.agent?.name || a?.data?.devname || 'device'));
+    const deviceList = Array.from(deviceSet).slice(0, 2).join(', ') + (deviceSet.size > 2 ? ` (+${deviceSet.size - 2})` : '');
+
+    heading.textContent = `Batch Dispatch (${alerts.length} Incidents) to Redmine`;
+    subheading.textContent = 'Consolidate multiple security alerts into a single Redmine tracking ticket';
+
+    let levelBadgeColor = '#94a3b8';
+    if (highestLevel >= 12) levelBadgeColor = '#f43f5e';
+    else if (highestLevel >= 8) levelBadgeColor = '#f97316';
+    else if (highestLevel >= 4) levelBadgeColor = '#eab308';
+
+    summaryBox.innerHTML = `
+      <div class="rd-alert-summary-header">
+        <span class="rd-alert-summary-title">Consolidated Batch of ${alerts.length} Security Alerts</span>
+        <span style="background:${levelBadgeColor}22; color:${levelBadgeColor}; border:1px solid ${levelBadgeColor}66; border-radius:4px; padding:2px 6px; font-size:11px; font-weight:700;">Max Level ${highestLevel}</span>
+      </div>
+      <div class="rd-alert-summary-meta">
+        <span><i data-lucide="layers" style="width:12px;height:12px;"></i> ${alerts.length} Events</span>
+        <span><i data-lucide="server" style="width:12px;height:12px;"></i> ${deviceList}</span>
+        <span><i data-lucide="clock" style="width:12px;height:12px;"></i> ${new Date().toLocaleTimeString()}</span>
+      </div>
+    `;
+
+    subjectInput.value = `[Batch SOC] ${alerts.length} Incidents (Max L${highestLevel}) on ${deviceList}`.slice(0, 255);
+
+    let defaultPriority = '3';
+    if (highestLevel >= 14) defaultPriority = '5';
+    else if (highestLevel >= 12) defaultPriority = '4';
+    else if (highestLevel >= 7)  defaultPriority = '3';
+    else if (highestLevel >= 4)  defaultPriority = '2';
+    else defaultPriority = '1';
+
+    if (prioritySelect) prioritySelect.value = defaultPriority;
+    if (notesInput) notesInput.value = '';
+
+    modal.style.display = 'flex';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    setTimeout(() => subjectInput?.focus(), 50);
+  }
+
+  function closeModal() {
+    const modal = document.getElementById('modal-redmine-dispatch');
+    if (modal) modal.style.display = 'none';
+  }
+
+  async function submitDispatch() {
+    const submitBtn = document.getElementById('rd-modal-submit-btn');
+    const subjectInput = document.getElementById('rd-modal-subject');
+    const prioritySelect = document.getElementById('rd-modal-priority');
+    const notesInput = document.getElementById('rd-modal-notes');
+
+    const customSubject = subjectInput?.value.trim();
+    if (!customSubject) {
+      if (window.Toast) window.Toast.show({ type: 'warn', title: 'Subject Required', body: 'Please enter a ticket subject', duration: 2500 });
+      return;
+    }
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i data-lucide="loader-2" class="spinning"></i> Dispatching…';
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    try {
+      let endpoint = '/api/redmine/dispatch';
+      let payload = {};
+
+      if (_mode === 'batch') {
+        endpoint = '/api/redmine/batch-dispatch';
+        payload = {
+          alerts: _activeAlerts,
+          customSubject,
+          priorityId: prioritySelect?.value || '3',
+          notes: notesInput?.value.trim() || '',
+        };
+      } else {
+        payload = {
+          alert: _activeAlert,
+          alertId: _activeAlert?.id,
+          customSubject,
+          priorityId: prioritySelect?.value || '3',
+          notes: notesInput?.value.trim() || '',
+        };
+      }
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!data.ok) {
+        throw new Error(data.error || 'Failed to dispatch ticket');
+      }
+
+      const issueId = data.issueId;
+      const issueUrl = data.issueUrl || `http://10.145.10.62:3000/issues/${issueId}`;
+
+      if (window.Toast) {
+        window.Toast.show({
+          type: 'success',
+          title: `🎟️ Ticket #${issueId} Created!`,
+          body: `<a href="${issueUrl}" target="_blank" style="color:#ffffff; text-decoration:underline; font-weight:600;">View in Redmine →</a>`,
+          duration: 5000,
+        });
+      }
+
+      // Re-render Discover or Dashboard to display ticket badge immediately
+      if (window.DiscoverController) {
+        if (typeof window.DiscoverController.clearSelection === 'function') {
+          window.DiscoverController.clearSelection();
+        }
+        if (typeof window.DiscoverController.renderAll === 'function') {
+          window.DiscoverController.renderAll();
+        }
+      }
+
+      closeModal();
+    } catch (err) {
+      if (window.Toast) {
+        window.Toast.show({
+          type: 'error',
+          title: 'Dispatch Failed',
+          body: err.message,
+          duration: 4500,
+        });
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i data-lucide="send"></i> <span>Create Redmine Ticket</span>';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      }
+    }
+  }
+
+  function _escapeHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  return {
+    openSingleModal,
+    openBatchModal,
+    closeModal,
+    submitDispatch,
+  };
+})();
+
 window.RedmineController = RedmineController;
+window.RedmineDispatchController = RedmineDispatchController;

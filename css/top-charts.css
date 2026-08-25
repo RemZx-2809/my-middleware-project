@@ -3124,3 +3124,199 @@ tr.doc-row--active td {
 }
 .fh-diff-pre--before { background: rgba(244,87,106,0.04); }
 .fh-diff-pre--after  { background: rgba(45,212,167,0.04); }
+
+/* ── REDMINE DISPATCH MODAL & BADGES ─────────────────────── */
+.modal-card--redmine {
+  max-width: 580px;
+  width: 92%;
+  background: #0f1523;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75), 0 0 30px rgba(167, 139, 250, 0.15);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 100000;
+  position: relative;
+  margin: auto;
+}
+
+.modal-header--redmine {
+  background: rgba(167, 139, 250, 0.08);
+  border-bottom: 1px solid rgba(167, 139, 250, 0.18);
+  padding: 16px 20px;
+}
+
+.rd-alert-summary-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rd-alert-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rd-alert-summary-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.rd-alert-summary-meta {
+  font-size: 11px;
+  color: #94a3b8;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rd-alert-summary-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Clickable Ticket Badge on Rows */
+.redmine-ticket-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  background: rgba(167, 139, 250, 0.15);
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  color: #c4b5fd;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.redmine-ticket-badge:hover {
+  background: rgba(167, 139, 250, 0.28);
+  border-color: #a78bfa;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(167, 139, 250, 0.4);
+}
+
+.btn-dispatch-ticket {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  color: #c4b5fd;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-dispatch-ticket:hover {
+  background: rgba(167, 139, 250, 0.25);
+  border-color: #a78bfa;
+  color: #ffffff;
+}
+
+/* ── FLOATING BATCH TOOLBAR ───────────────────────────────── */
+.batch-floating-toolbar {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 20px rgba(167, 139, 250, 0.2);
+  border-radius: 30px;
+  padding: 8px 18px;
+  animation: slideUpFade 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 15px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.batch-toolbar-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.batch-toolbar-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #e2e8f0;
+}
+
+.batch-pill {
+  background: #7c3aed;
+  color: #ffffff;
+  padding: 1px 7px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.batch-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.batch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+}
+
+.batch-btn--primary {
+  background: #7c3aed;
+  border: 1px solid #8b5cf6;
+  color: #ffffff;
+}
+
+.batch-btn--primary:hover {
+  background: #6d28d9;
+  box-shadow: 0 0 12px rgba(124, 58, 237, 0.5);
+}
+
+.batch-btn--ghost {
+  background: transparent;
+  color: #94a3b8;
+}
+
+.batch-btn--ghost:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
