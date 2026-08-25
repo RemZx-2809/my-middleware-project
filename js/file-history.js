@@ -1,45 +1,37 @@
 /**
- * Aegis SOC — File Edit History Controller
- * Displays audit trail of file changes from /api/audit-logs.
- * Features: search, filter by action, diff viewer modal, stats.
+ * Aegis SOC — Resolved Vulnerabilities History Controller
+ * Manages permanent history of closed and resolved security issues from Redmine.
+ * Features: live search, priority filter, sync from Redmine, multi-select checkboxes,
+ * batch bulk delete, detail inspection modal, and statistics.
  */
 
 'use strict';
 
 const FileHistoryController = (() => {
 
-  /* ── Action badge metadata ───────────────────────────────── */
-  const ACTION_META = {
-    rule_created:          { label: 'Created',       cls: 'fh-badge--created',     icon: 'file-plus-2' },
-    rule_updated:          { label: 'Updated',       cls: 'fh-badge--updated',     icon: 'file-pen-line' },
-    rule_deleted:          { label: 'Deleted',       cls: 'fh-badge--deleted',     icon: 'file-x-2' },
-    redmine_issue_created: { label: 'Redmine Issue', cls: 'fh-badge--redmine',     icon: 'ticket' },
-    redmine_fix_synced:    { label: 'Redmine Fix',   cls: 'fh-badge--redmine-fix', icon: 'check-circle-2' },
-    config_update:         { label: 'Config',        cls: 'fh-badge--config',      icon: 'settings-2' },
-    data_cleared:          { label: 'Cleared',       cls: 'fh-badge--cleared',     icon: 'trash-2' },
-    audit_logs_cleared:    { label: 'Audit Cleared', cls: 'fh-badge--cleared',     icon: 'eraser' },
+  /* ── Priority badge styling ──────────────────────────────── */
+  const PRIORITY_META = {
+    Immediate: { label: 'Immediate', cls: 'fh-prio--immediate', icon: 'flame' },
+    Urgent:    { label: 'Urgent',    cls: 'fh-prio--urgent',    icon: 'alert-triangle' },
+    High:      { label: 'High',      cls: 'fh-prio--high',      icon: 'alert-circle' },
+    Normal:    { label: 'Normal',    cls: 'fh-prio--normal',    icon: 'info' },
+    Low:       { label: 'Low',       cls: 'fh-prio--low',       icon: 'arrow-down' },
   };
 
-  const FILE_ACTIONS = new Set(['rule_created', 'rule_updated', 'rule_deleted', 'config_update', 'redmine_issue_created', 'redmine_fix_synced']);
-
-  let _allLogs = [];
+  let _allRecords = [];
   let _loading = false;
   let _searchVal = '';
-  let _actionFilter = '';
+  let _priorityFilter = '';
+  const _selectedIds = new Set();
 
   /* ── Helpers ─────────────────────────────────────────────── */
   function _esc(str) {
+    if (!str) return '';
     return String(str)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
-  }
-
-  function _extractUrl(text) {
-    if (!text) return null;
-    const match = text.match(/https?:\/\/[^\s\n\r"']+/);
-    return match ? match[0] : null;
   }
 
   function _fmtDate(iso) {
@@ -48,7 +40,7 @@ const FileHistoryController = (() => {
     if (isNaN(d)) return iso;
     return d.toLocaleString('th-TH', {
       year: 'numeric', month: 'short', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour: '2-digit', minute: '2-digit',
     });
   }
 
@@ -66,259 +58,494 @@ const FileHistoryController = (() => {
     if (el) el.textContent = v;
   }
 
-  /* ── Stats ───────────────────────────────────────────────── */
-  function _renderStats(logs) {
-    const counts = { created: 0, updated: 0, deleted: 0, other: 0 };
-    for (const l of logs) {
-      if (l.action === 'rule_created' || l.action === 'redmine_issue_created')  counts.created++;
-      else if (l.action === 'rule_updated' || l.action === 'config_update' || l.action === 'redmine_fix_synced') counts.updated++;
-      else if (l.action === 'rule_deleted') counts.deleted++;
-      else counts.other++;
+  function _showToast(type, title, body) {
+    if (typeof Toast !== 'undefined' && Toast.show) {
+      Toast.show({ type, title, body, duration: 4000 });
     }
-    _setText('fh-stat-total',   logs.length.toLocaleString());
-    _setText('fh-stat-created', counts.created.toLocaleString());
-    _setText('fh-stat-updated', counts.updated.toLocaleString());
-    _setText('fh-stat-deleted', counts.deleted.toLocaleString());
-    _setText('fh-stat-other',   counts.other.toLocaleString());
   }
 
-  /* ── Row rendering ───────────────────────────────────────── */
+  /* ── Stats ───────────────────────────────────────────────── */
+  function _renderStats(records) {
+    let critCount = 0;
+    const deviceSet = new Set();
+    let fileCount = 0;
+    let monthCount = 0;
+
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth();
+
+    for (const r of records) {
+      const prio = (r.priority || '').toLowerCase();
+      if (prio.includes('immediate') || prio.includes('urgent') || prio.includes('high')) {
+        critCount++;
+      }
+      if (r.targetDevice && r.targetDevice !== 'Unknown Device') {
+        deviceSet.add(r.targetDevice);
+      }
+      if (r.targetFile) {
+        fileCount++;
+      }
+      if (r.closedAt) {
+        const d = new Date(r.closedAt);
+        if (d.getFullYear() === curYear && d.getMonth() === curMonth) {
+          monthCount++;
+        }
+      }
+    }
+
+    _setText('fh-stat-total',   records.length.toLocaleString());
+    _setText('fh-stat-crit',    critCount.toLocaleString());
+    _setText('fh-stat-devices', deviceSet.size.toLocaleString());
+    _setText('fh-stat-files',   fileCount.toLocaleString());
+    _setText('fh-stat-month',   monthCount.toLocaleString());
+  }
+
+  /* ── Filter ──────────────────────────────────────────────── */
   function _getFiltered() {
     const q = _searchVal.toLowerCase();
-    return _allLogs.filter(l => {
-      if (_actionFilter && l.action !== _actionFilter) return false;
+    return _allRecords.filter(r => {
+      if (_priorityFilter && r.priority !== _priorityFilter) return false;
       if (q) {
-        const hay = `${l.filename} ${l.user} ${l.action} ${l.before} ${l.after}`.toLowerCase();
+        const hay = `${r.subject} ${r.targetDevice} ${r.targetFile} ${r.closedBy} ${r.ruleId} ${r.resolutionNotes} ${r.issueId || ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
   }
 
-  function _truncate(str, max = 60) {
+  function _truncate(str, max = 70) {
     if (!str) return '—';
     const s = str.replace(/\s+/g, ' ').trim();
     return s.length > max ? s.slice(0, max) + '…' : s;
   }
 
-  function _renderTable(logs) {
-    const tbody = document.getElementById('fh-table-body');
-    const empty  = document.getElementById('fh-empty');
-    const rowCnt = document.getElementById('fh-row-count');
+  /* ── Batch Selection UI Update ───────────────────────────── */
+  function _updateBatchBar(filtered) {
+    const batchBar = document.getElementById('fh-batch-bar');
+    const selCountEl = document.getElementById('fh-selected-count');
+    const selBtnCountEl = document.getElementById('fh-selected-btn-count');
+    const checkAll = document.getElementById('fh-check-all');
 
+    const count = _selectedIds.size;
+
+    if (batchBar) {
+      batchBar.style.display = count > 0 ? 'flex' : 'none';
+    }
+    if (selCountEl) selCountEl.textContent = count.toLocaleString();
+    if (selBtnCountEl) selBtnCountEl.textContent = count.toLocaleString();
+
+    if (checkAll && filtered) {
+      if (filtered.length === 0) {
+        checkAll.checked = false;
+        checkAll.indeterminate = false;
+      } else {
+        const visibleSelectedCount = filtered.filter(r => _selectedIds.has(r.id)).length;
+        checkAll.checked = visibleSelectedCount > 0 && visibleSelectedCount === filtered.length;
+        checkAll.indeterminate = visibleSelectedCount > 0 && visibleSelectedCount < filtered.length;
+      }
+    }
+  }
+
+  /* ── Table Rendering ─────────────────────────────────────── */
+  function _renderTable() {
+    const tbody   = document.getElementById('fh-table-body');
+    const emptyEl = document.getElementById('fh-empty');
+    const countEl = document.getElementById('fh-row-count');
     if (!tbody) return;
 
-    if (rowCnt) rowCnt.textContent = `${logs.length.toLocaleString()} ${logs.length === 1 ? 'entry' : 'entries'}`;
+    const filtered = _getFiltered();
 
-    if (logs.length === 0) {
+    if (countEl) {
+      countEl.textContent = `${filtered.length} resolved issue${filtered.length === 1 ? '' : 's'}`;
+    }
+
+    if (filtered.length === 0) {
       tbody.innerHTML = '';
-      if (empty) empty.style.display = 'flex';
+      if (emptyEl) emptyEl.style.display = 'flex';
+      _updateBatchBar(filtered);
       return;
     }
-    if (empty) empty.style.display = 'none';
 
-    const hasDiff = (l) => (l.before && l.before !== '(new file)') || (l.after && l.after !== '(deleted)');
+    if (emptyEl) emptyEl.style.display = 'none';
 
-    tbody.innerHTML = logs.map((l, idx) => {
-      const meta  = ACTION_META[l.action] || { label: l.action, cls: 'fh-badge--other', icon: 'activity' };
-      const fname = l.filename || '—';
-      const detail = _truncate(l.after || l.before, 64);
-      const rel   = _relTime(l.timestamp);
-      const showBtn = hasDiff(l);
-      const url = _extractUrl(l.after) || _extractUrl(l.before);
+    tbody.innerHTML = filtered.map((r, idx) => {
+      const isChecked = _selectedIds.has(r.id);
+      const prioMeta = PRIORITY_META[r.priority] || { label: r.priority || 'Normal', cls: 'fh-prio--normal', icon: 'info' };
+      const issueLink = r.issueUrl
+        ? `<a href="${_esc(r.issueUrl)}" target="_blank" rel="noopener" class="fh-issue-chip" title="Open Ticket in Redmine" onclick="event.stopPropagation();">
+             <i data-lucide="ticket"></i>
+             <span>#${r.issueId || '—'}</span>
+           </a>`
+        : `<span class="fh-issue-chip"><i data-lucide="ticket"></i> #${r.issueId || '—'}</span>`;
+
+      const targetDevice = r.targetDevice ? `<span class="fh-dev-badge"><i data-lucide="server"></i> ${_esc(r.targetDevice)}</span>` : '';
+      const targetFile = r.targetFile ? `<span class="fh-file-path" title="${_esc(r.targetFile)}"><i data-lucide="file-code-2"></i> ${_esc(_truncate(r.targetFile, 25))}</span>` : '';
 
       return `
-        <tr class="fh-tr" data-idx="${idx}">
+        <tr class="fh-tr ${isChecked ? 'fh-tr--selected' : ''}" data-idx="${idx}" data-id="${_esc(r.id)}">
+          <td class="fh-td fh-td--check" onclick="event.stopPropagation();">
+            <input type="checkbox" class="fh-row-check fh-custom-checkbox" data-id="${_esc(r.id)}" ${isChecked ? 'checked' : ''} />
+          </td>
           <td class="fh-td fh-td--ts">
-            <span class="fh-ts-main">${_fmtDate(l.timestamp)}</span>
-            <span class="fh-ts-rel">${rel}</span>
+            <span class="fh-ts-main">${_fmtDate(r.closedAt)}</span>
+            <span class="fh-ts-rel">${_relTime(r.closedAt)}</span>
           </td>
-          <td class="fh-td fh-td--action">
-            <span class="fh-badge ${meta.cls}">
-              <i data-lucide="${meta.icon}"></i>
-              ${_esc(meta.label)}
+          <td class="fh-td fh-td--issue">
+            ${issueLink}
+            <span class="fh-prio-badge ${prioMeta.cls}">
+              <i data-lucide="${prioMeta.icon}"></i>
+              ${_esc(prioMeta.label)}
             </span>
           </td>
-          <td class="fh-td fh-td--file">
-            <span class="fh-file-chip" title="${_esc(fname)}">
-              <i data-lucide="${l.action.startsWith('redmine') ? 'ticket' : 'file-code-2'}"></i>
-              ${_esc(fname)}
-            </span>
-            ${url ? `<a href="${_esc(url)}" target="_blank" rel="noopener" class="fh-ext-link" title="Open in Redmine" onclick="event.stopPropagation();"><i data-lucide="external-link"></i></a>` : ''}
+          <td class="fh-td fh-td--subject">
+            <span class="fh-subject-text" title="${_esc(r.subject)}">${_esc(r.subject)}</span>
+            ${r.ruleId ? `<span class="fh-rule-tag">Rule #${_esc(r.ruleId)}</span>` : ''}
+          </td>
+          <td class="fh-td fh-td--target">
+            <div class="fh-target-wrap">
+              ${targetDevice}
+              ${targetFile}
+            </div>
           </td>
           <td class="fh-td fh-td--user">
-            <span class="fh-user-chip">
-              <i data-lucide="user-round"></i>
-              ${_esc(l.user || '—')}
-            </span>
+            <span class="fh-user-chip"><i data-lucide="user-check"></i> ${_esc(r.closedBy || 'Admin')}</span>
           </td>
           <td class="fh-td fh-td--detail">
-            <span class="fh-detail-text" title="${_esc(l.after || l.before || '')}">${_esc(detail)}</span>
+            <span class="fh-detail-text" title="${_esc(r.resolutionNotes)}">${_esc(_truncate(r.resolutionNotes, 65))}</span>
           </td>
-          <td class="fh-td fh-td--expand">
-            ${showBtn ? `<button class="fh-expand-btn" data-idx="${idx}" title="View diff" aria-label="View change details"><i data-lucide="eye"></i></button>` : ''}
+          <td class="fh-td fh-td--actions" onclick="event.stopPropagation();">
+            <div class="fh-actions-wrap">
+              <button class="fh-action-btn fh-action-btn--view" data-idx="${idx}" title="View Details">
+                <i data-lucide="eye"></i>
+              </button>
+              <button class="fh-action-btn fh-action-btn--del" data-id="${_esc(r.id)}" title="Delete Record">
+                <i data-lucide="trash-2"></i>
+              </button>
+            </div>
           </td>
         </tr>
       `;
     }).join('');
 
-    if (typeof lucide !== 'undefined') lucide.createIcons();
+    // Row Checkbox Listeners
+    tbody.querySelectorAll('.fh-row-check').forEach(cb => {
+      cb.addEventListener('change', (e) => {
+        const id = cb.getAttribute('data-id');
+        if (cb.checked) {
+          _selectedIds.add(id);
+        } else {
+          _selectedIds.delete(id);
+        }
+        const row = cb.closest('tr');
+        if (row) row.classList.toggle('fh-tr--selected', cb.checked);
+        _updateBatchBar(filtered);
+      });
+    });
 
-    // Wire expand buttons
-    tbody.querySelectorAll('.fh-expand-btn').forEach(btn => {
+    // Row Click Listeners (opens modal unless clicking interactive elements)
+    tbody.querySelectorAll('.fh-tr').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('input[type="checkbox"]') || e.target.closest('button') || e.target.closest('a')) {
+          return;
+        }
+        const idx = parseInt(row.getAttribute('data-idx'), 10);
+        _openDetail(filtered[idx]);
+      });
+    });
+
+    // View button
+    tbody.querySelectorAll('.fh-action-btn--view').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const idx = parseInt(btn.getAttribute('data-idx'), 10);
-        const filtered = _getFiltered();
-        if (filtered[idx]) _openDiff(filtered[idx]);
+        _openDetail(filtered[idx]);
       });
     });
 
-    // Also row click to expand
-    tbody.querySelectorAll('.fh-tr').forEach(tr => {
-      tr.addEventListener('click', () => {
-        const idx = parseInt(tr.getAttribute('data-idx'), 10);
-        const filtered = _getFiltered();
-        if (filtered[idx] && (filtered[idx].before || filtered[idx].after)) {
-          _openDiff(filtered[idx]);
+    // Delete single button
+    tbody.querySelectorAll('.fh-action-btn--del').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        if (confirm('Delete this resolved vulnerability record? (ลบประวัติรายการนี้หรือไม่?)')) {
+          await _deleteRecord(id);
         }
       });
     });
+
+    _updateBatchBar(filtered);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
   }
 
-  /* ── Diff Modal ──────────────────────────────────────────── */
-  function _openDiff(entry) {
+  /* ── Detail Modal ────────────────────────────────────────── */
+  function _openDetail(record) {
+    if (!record) return;
+
     const modal    = document.getElementById('fh-diff-modal');
-    const fileEl   = document.getElementById('fh-diff-filename');
+    const titleEl  = document.getElementById('fh-diff-filename');
     const metaEl   = document.getElementById('fh-diff-meta');
     const beforeEl = document.getElementById('fh-diff-before');
     const afterEl  = document.getElementById('fh-diff-after');
 
     if (!modal) return;
 
-    const url = _extractUrl(entry.after) || _extractUrl(entry.before);
-    let titleHtml = _esc(entry.filename || 'Change Details');
-    if (url) {
-      titleHtml += ` <a href="${_esc(url)}" target="_blank" rel="noopener" class="fh-modal-ext-btn"><i data-lucide="external-link"></i> Open in Redmine</a>`;
+    let titleHtml = _esc(record.subject);
+    if (record.issueUrl) {
+      titleHtml += ` <a href="${_esc(record.issueUrl)}" target="_blank" rel="noopener" class="fh-modal-ext-btn"><i data-lucide="external-link"></i> Open in Redmine</a>`;
     }
 
-    if (fileEl) fileEl.innerHTML = titleHtml;
-    if (metaEl) metaEl.textContent = `${entry.action} · ${_fmtDate(entry.timestamp)} · by ${entry.user}`;
-    if (beforeEl) beforeEl.textContent = entry.before || '(empty)';
-    if (afterEl)  afterEl.textContent  = entry.after  || '(empty)';
+    if (titleEl)  titleEl.innerHTML = titleHtml;
+    if (metaEl) {
+      metaEl.textContent = `Issue #${record.issueId || 'N/A'} • Closed by ${record.closedBy || 'Admin'} on ${_fmtDate(record.closedAt)} (${record.priority || 'Normal'} Priority)`;
+    }
+
+    const beforeText = [
+      `TARGET DEVICE:  ${record.targetDevice || 'Unknown'}`,
+      `TARGET FILE:    ${record.targetFile || 'None specified'}`,
+      `RULE ID:        ${record.ruleId || 'None'}`,
+      ``,
+      `--- VULNERABILITY / ALERT PAYLOAD ---`,
+      record.description || 'No additional raw alert description available.'
+    ].join('\n');
+
+    const afterText = [
+      `STATUS:         ${record.status || 'Closed'}`,
+      `RESOLVED BY:    ${record.closedBy || 'Admin'}`,
+      `CLOSED AT:      ${_fmtDate(record.closedAt)}`,
+      ``,
+      `--- RESOLUTION & FIX NOTES ---`,
+      record.resolutionNotes || 'Marked as resolved and closed.'
+    ].join('\n');
+
+    if (beforeEl) beforeEl.textContent = beforeText;
+    if (afterEl)  afterEl.textContent  = afterText;
 
     modal.style.display = 'flex';
-    document.body.style.overflow = 'hidden';
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
 
-  function _closeDiff() {
+  function _closeDetail() {
     const modal = document.getElementById('fh-diff-modal');
     if (modal) modal.style.display = 'none';
-    document.body.style.overflow = '';
   }
 
-  /* ── Main load ───────────────────────────────────────────── */
+  /* ── API Calls ───────────────────────────────────────────── */
+  async function _deleteRecord(id) {
+    try {
+      const res = await fetch(`/api/resolved-history?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.ok) {
+        _selectedIds.delete(id);
+        _showToast('ok', 'Record Deleted', 'Resolved vulnerability record removed.');
+        await load();
+      } else {
+        throw new Error(data.error || 'Failed to delete');
+      }
+    } catch (err) {
+      _showToast('error', 'Delete Error', err.message);
+    }
+  }
+
+  async function _deleteSelectedRecords() {
+    const ids = Array.from(_selectedIds);
+    if (ids.length === 0) return;
+
+    if (!confirm(`Delete ${ids.length} selected resolved vulnerability records?\n(ต้องการลบ ${ids.length} รายการที่เลือกไว้หรือไม่?)`)) {
+      return;
+    }
+
+    const delBtn = document.getElementById('fh-delete-selected-btn');
+    if (delBtn) {
+      delBtn.disabled = true;
+      delBtn.innerHTML = '<i data-lucide="loader-2"></i> Deleting…';
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    try {
+      const res = await fetch('/api/resolved-history', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json();
+
+      if (data.ok) {
+        _selectedIds.clear();
+        _showToast('ok', 'Selected Records Deleted', `Successfully removed ${data.deletedCount || ids.length} records.`);
+        await load();
+      } else {
+        throw new Error(data.error || 'Failed to delete selected items');
+      }
+    } catch (err) {
+      _showToast('error', 'Batch Delete Failed', err.message);
+    } finally {
+      if (delBtn) {
+        delBtn.disabled = false;
+        delBtn.innerHTML = '<i data-lucide="trash-2"></i> Delete Selected (<span id="fh-selected-btn-count">0</span>)';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      }
+    }
+  }
+
+  async function _clearAll() {
+    if (!confirm('Are you sure you want to clear ALL resolved vulnerabilities history?\n(คุณแน่ใจหรือไม่ว่าต้องการล้างประวัติช่องโหว่ที่ปิดแล้วทั้งหมด?)')) {
+      return;
+    }
+    try {
+      const res = await fetch('/api/resolved-history', { method: 'DELETE' });
+      const data = await res.json();
+      if (data.ok) {
+        _selectedIds.clear();
+        _showToast('ok', 'History Cleared', 'All resolved vulnerability history wiped.');
+        await load();
+      } else {
+        throw new Error(data.error || 'Failed to clear');
+      }
+    } catch (err) {
+      _showToast('error', 'Clear Error', err.message);
+    }
+  }
+
+  async function _syncFromRedmine() {
+    const btn = document.getElementById('fh-sync-redmine-btn');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i data-lucide="loader-2"></i> Syncing…';
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    try {
+      const res = await fetch('/api/resolved-history/sync', { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        _showToast('ok', 'Redmine Sync Completed', `Synced ${data.syncedCount || 0} closed issues from Redmine.`);
+        await load();
+      } else {
+        throw new Error(data.error || 'Sync failed');
+      }
+    } catch (err) {
+      _showToast('error', 'Sync Failed', err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="refresh-cw"></i> Sync from Redmine';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      }
+    }
+  }
+
+  /* ── Main Load ───────────────────────────────────────────── */
   async function load() {
     if (_loading) return;
     _loading = true;
 
-    const btn     = document.getElementById('fh-refresh-btn');
-    const loading = document.getElementById('fh-loading');
-    const empty   = document.getElementById('fh-empty');
-    const tbody   = document.getElementById('fh-table-body');
+    const refreshBtn = document.getElementById('fh-refresh-btn');
+    const loadingEl  = document.getElementById('fh-loading');
+    const emptyEl    = document.getElementById('fh-empty');
+    const tbody      = document.getElementById('fh-table-body');
 
-    if (btn)     btn.classList.add('spinning');
-    if (loading) { loading.style.display = 'flex'; }
-    if (empty)   empty.style.display = 'none';
-    if (tbody)   tbody.innerHTML = '';
-
-    const limit  = document.getElementById('fh-filter-limit')?.value || '200';
-    const action = document.getElementById('fh-filter-action')?.value || '';
+    if (refreshBtn) refreshBtn.classList.add('spinning');
+    if (loadingEl)  loadingEl.style.display = 'flex';
+    if (emptyEl)    emptyEl.style.display   = 'none';
+    if (tbody)      tbody.innerHTML         = '';
 
     try {
-      const params = new URLSearchParams({ limit });
-      if (action) params.set('action', action);
-
-      const res  = await fetch(`/api/audit-logs?${params}`);
+      const res  = await fetch('/api/resolved-history?limit=500');
       const data = await res.json();
 
-      if (!data.ok) throw new Error('API error');
+      if (!data.ok) throw new Error(data.error || 'API error');
 
-      _allLogs = data.logs || [];
-      _renderStats(_allLogs);
-      const filtered = _getFiltered();
-      _renderTable(filtered);
+      _allRecords = Array.isArray(data.records) ? data.records : [];
+      _renderStats(_allRecords);
+      _renderTable();
 
-      const lu = document.getElementById('fh-last-updated');
-      if (lu) lu.textContent = `Updated: ${new Date().toLocaleTimeString('th-TH')}`;
+      const lastUpdatedEl = document.getElementById('fh-last-updated');
+      if (lastUpdatedEl) {
+        lastUpdatedEl.textContent = `Updated: ${new Date().toLocaleTimeString('th-TH')}`;
+      }
 
     } catch (err) {
-      console.error('[FileHistory] load failed:', err);
-      if (empty) { empty.style.display = 'flex'; empty.querySelector('span').textContent = 'Failed to load history'; }
+      console.error('[ResolvedHistory] Load failed:', err);
+      if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--crit);padding:30px;">Failed to load resolved history: ${_esc(err.message)}</td></tr>`;
     } finally {
       _loading = false;
-      if (btn)     btn.classList.remove('spinning');
-      if (loading) loading.style.display = 'none';
+      if (refreshBtn) refreshBtn.classList.remove('spinning');
+      if (loadingEl)  loadingEl.style.display = 'none';
+      if (typeof lucide !== 'undefined') lucide.createIcons();
     }
-  }
-
-  /* ── Clear all history ───────────────────────────────────── */
-  async function _clearHistory() {
-    if (!confirm('Clear all audit history? This cannot be undone.')) return;
-    try {
-      const res = await fetch('/api/audit-logs', { method: 'DELETE' });
-      const d   = await res.json();
-      if (d.ok) {
-        _allLogs = [];
-        _renderStats([]);
-        _renderTable([]);
-        const lu = document.getElementById('fh-last-updated');
-        if (lu) lu.textContent = 'Cleared';
-      }
-    } catch (e) {
-      alert('Failed to clear history: ' + e.message);
-    }
-  }
-
-  /* ── Search + filter debounce ────────────────────────────── */
-  let _debounce = null;
-  function _onSearch(val) {
-    _searchVal = val;
-    clearTimeout(_debounce);
-    _debounce = setTimeout(() => _renderTable(_getFiltered()), 200);
   }
 
   /* ── Init ────────────────────────────────────────────────── */
   function init() {
+    // Search input
+    const searchInput = document.getElementById('fh-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        _searchVal = e.target.value.trim();
+        _renderTable();
+      });
+    }
+
+    // Priority filter
+    const prioSelect = document.getElementById('fh-filter-priority');
+    if (prioSelect) {
+      prioSelect.addEventListener('change', (e) => {
+        _priorityFilter = e.target.value;
+        _renderTable();
+      });
+    }
+
+    // Check all checkbox
+    const checkAll = document.getElementById('fh-check-all');
+    if (checkAll) {
+      checkAll.addEventListener('change', (e) => {
+        const filtered = _getFiltered();
+        if (checkAll.checked) {
+          filtered.forEach(r => _selectedIds.add(r.id));
+        } else {
+          filtered.forEach(r => _selectedIds.delete(r.id));
+        }
+        _renderTable();
+      });
+    }
+
+    // Delete selected button
+    const deleteSelectedBtn = document.getElementById('fh-delete-selected-btn');
+    if (deleteSelectedBtn) {
+      deleteSelectedBtn.addEventListener('click', _deleteSelectedRecords);
+    }
+
+    // Deselect all button
+    const deselectBtn = document.getElementById('fh-deselect-all-btn');
+    if (deselectBtn) {
+      deselectBtn.addEventListener('click', () => {
+        _selectedIds.clear();
+        _renderTable();
+      });
+    }
+
     // Refresh button
-    document.getElementById('fh-refresh-btn')?.addEventListener('click', load);
+    const refreshBtn = document.getElementById('fh-refresh-btn');
+    if (refreshBtn) refreshBtn.addEventListener('click', load);
 
-    // Search
-    document.getElementById('fh-search')?.addEventListener('input', (e) => _onSearch(e.target.value));
+    // Sync button
+    const syncBtn = document.getElementById('fh-sync-redmine-btn');
+    if (syncBtn) syncBtn.addEventListener('click', _syncFromRedmine);
 
-    // Action filter dropdown
-    document.getElementById('fh-filter-action')?.addEventListener('change', (e) => {
-      _actionFilter = e.target.value;
-      _renderTable(_getFiltered());
-    });
+    // Clear all button
+    const clearBtn = document.getElementById('fh-clear-btn');
+    if (clearBtn) clearBtn.addEventListener('click', _clearAll);
 
-    // Limit filter
-    document.getElementById('fh-filter-limit')?.addEventListener('change', () => load());
+    // Modal close handlers
+    const modalClose = document.getElementById('fh-diff-close');
+    const modalBackdrop = document.getElementById('fh-diff-backdrop');
+    if (modalClose) modalClose.addEventListener('click', _closeDetail);
+    if (modalBackdrop) modalBackdrop.addEventListener('click', _closeDetail);
 
-    // Clear button
-    document.getElementById('fh-clear-btn')?.addEventListener('click', _clearHistory);
-
-    // Diff modal close
-    document.getElementById('fh-diff-close')?.addEventListener('click', _closeDiff);
-    document.getElementById('fh-diff-backdrop')?.addEventListener('click', _closeDiff);
-
-    // Escape closes modal
+    // ESC closes modal
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        const modal = document.getElementById('fh-diff-modal');
-        if (modal && modal.style.display !== 'none') _closeDiff();
-      }
+      if (e.key === 'Escape') _closeDetail();
     });
   }
 

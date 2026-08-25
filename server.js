@@ -10,6 +10,7 @@ const http         = require('http');
 const https        = require('https');
 const fs           = require('fs');
 const path         = require('path');
+const { spawn }    = require('child_process');
 
 const PORT        = parseInt(process.env.PORT || '3000', 10);
 const STATIC_ROOT = path.resolve(__dirname);
@@ -20,6 +21,7 @@ if (!fs.existsSync(RULES_DIR)) fs.mkdirSync(RULES_DIR, { recursive: true });
 
 const { logAudit, getAuditLogs, clearAuditLogs } = require('./services/auditLog');
 const { testConnection: testRedmineConnection, createIssueFromAlert: createRedmineIssue, syncResolvedIssues: syncRedmineIssues, shouldTriggerTicket } = require('./services/redmine');
+const { addResolvedRecord, getResolvedHistory, deleteResolvedRecord, deleteMultipleResolvedRecords, clearResolvedHistory, syncClosedIssuesFromRedmine } = require('./services/resolvedHistory');
 
 /* ════════════════════════════════════════════════════════════
    SECURITY — rate limiter
@@ -55,6 +57,9 @@ function denyAdminIp(res, ip) {
   return json(res, 403, { error: 'Forbidden: Admin actions are restricted by IP allowlist.' });
 }
 
+/* ── Service Activation Timestamp ──────────────────────── */
+const _serviceBootTime = new Date().toISOString();
+
 /* ── Load persisted config ─────────────────────────────── */
 let _config = {
   webhookSecret: '',
@@ -68,11 +73,107 @@ let _config = {
   redmineCustomRules: '',          // comma-separated Rule IDs (e.g. 81628, 5710, 550)
   redmineDedupHours: '24',         // deduplication window in hours (0 = disable)
   redmineAutoTicket: true,
+  ingestSince: 'auto',             // 'auto' = automatically starts from the moment middleware starts running
 };
+/* ════════════════════════════════════════════════════════════
+   SSH REVERSE TUNNEL MANAGER
+   Opens: ssh -N -R <remotePort>:localhost:<PORT> <user>@<host>
+   Wazuh custom-aegis.py posts to 127.0.0.1:<remotePort> on the
+   Wazuh Manager, which travels through the tunnel to this server.
+════════════════════════════════════════════════════════════ */
+const SSH_KEY_PATH     = path.join(__dirname, '.aegis-ssh', 'id_rsa');
+const SSH_RECONNECT_MS = 10000; // 10s delay before reconnect attempt
+
 let _tunnelState = {
-  running: false,
-  startedAt: null,
+  running:    false,
+  startedAt:  null,
+  pid:        null,
+  host:       null,
+  user:       null,
+  remotePort: null,
+  error:      null,
+  reconnects: 0,
 };
+let _tunnelProcess   = null;
+let _tunnelReconnect = null; // reconnect timer
+let _tunnelStopped   = false; // user explicitly stopped — do NOT auto-reconnect
+
+function _startTunnel(host, user, remotePort = 3000) {
+  if (_tunnelProcess) return; // already running
+  _tunnelStopped = false;
+
+  const keyArg = fs.existsSync(SSH_KEY_PATH) ? ['-i', SSH_KEY_PATH] : [];
+  const args = [
+    '-N',                         // no remote command
+    '-T',                         // disable pseudo-tty
+    '-o', 'StrictHostKeyChecking=no',
+    '-o', 'ServerAliveInterval=30',
+    '-o', 'ServerAliveCountMax=3',
+    '-o', 'ExitOnForwardFailure=yes',
+    '-o', 'ConnectTimeout=15',
+    ...keyArg,
+    '-R', `${remotePort}:localhost:${PORT}`,
+    `${user}@${host}`,
+  ];
+
+  console.log(`[AEGIS Tunnel] Connecting → ssh -R ${remotePort}:localhost:${PORT} ${user}@${host}`);
+
+  const proc = spawn('ssh', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  _tunnelProcess = proc;
+
+  _tunnelState.running    = true;
+  _tunnelState.startedAt  = new Date().toISOString();
+  _tunnelState.pid        = proc.pid;
+  _tunnelState.host       = host;
+  _tunnelState.user       = user;
+  _tunnelState.remotePort = remotePort;
+  _tunnelState.error      = null;
+
+  proc.stderr.on('data', (d) => {
+    const msg = d.toString().trim();
+    if (msg) console.log(`[AEGIS Tunnel] ${msg}`);
+  });
+  proc.stdout.on('data', (d) => {
+    const msg = d.toString().trim();
+    if (msg) console.log(`[AEGIS Tunnel] ${msg}`);
+  });
+
+  proc.on('exit', (code, signal) => {
+    _tunnelProcess = null;
+    _tunnelState.running   = false;
+    _tunnelState.pid       = null;
+    _tunnelState.error     = `Exited: code=${code} signal=${signal}`;
+    console.warn(`[AEGIS Tunnel] Disconnected (code=${code} signal=${signal})`);
+
+    if (!_tunnelStopped) {
+      _tunnelState.reconnects++;
+      console.log(`[AEGIS Tunnel] Reconnecting in ${SSH_RECONNECT_MS / 1000}s... (attempt #${_tunnelState.reconnects})`);
+      _tunnelReconnect = setTimeout(() => _startTunnel(host, user, remotePort), SSH_RECONNECT_MS);
+    }
+  });
+
+  proc.on('error', (err) => {
+    _tunnelState.error = err.message;
+    console.error('[AEGIS Tunnel] Spawn error:', err.message);
+  });
+}
+
+function _stopTunnel() {
+  _tunnelStopped = true;
+  clearTimeout(_tunnelReconnect);
+  _tunnelReconnect = null;
+  if (_tunnelProcess) {
+    console.log('[AEGIS Tunnel] Stopping tunnel process...');
+    _tunnelProcess.kill('SIGTERM');
+    _tunnelProcess = null;
+  }
+  _tunnelState.running    = false;
+  _tunnelState.startedAt  = null;
+  _tunnelState.pid        = null;
+  _tunnelState.error      = null;
+  _tunnelState.reconnects = 0;
+  console.log('[AEGIS Tunnel] Stopped.');
+}
 function _loadConfig() {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
@@ -193,7 +294,43 @@ function classifyUseCase(alert) {
   return null; // discard low-severity misc alerts
 }
 
-function storeAlert(alert) {
+function getEffectiveIngestCutoff() {
+  if (!_config.ingestSince || _config.ingestSince === 'auto') {
+    return _serviceBootTime;
+  }
+  const t = new Date(_config.ingestSince).getTime();
+  if (isNaN(t) || t <= 0) return _serviceBootTime;
+  return new Date(_config.ingestSince).toISOString();
+}
+
+/**
+ * Filter alert by activation start timestamp (ingestSince)
+ * - Live Webhooks arriving via HTTP POST are always accepted in real-time.
+ * - Historical / Bulk Ingest archives are strictly filtered against the activation timestamp.
+ */
+function isAlertAllowedByIngestSince(alert, isLiveWebhook = false) {
+  if (isLiveWebhook) return true; // Live webhooks are real-time events occurring right now
+
+  const cutoffStr = getEffectiveIngestCutoff();
+  const cutoffMs = new Date(cutoffStr).getTime();
+  if (isNaN(cutoffMs) || cutoffMs <= 0) return true;
+
+  const rawTs = alert?.timestamp || alert?.receivedAt || alert?.['@timestamp'];
+  if (!rawTs) return true;
+
+  const alertMs = new Date(rawTs).getTime();
+  if (isNaN(alertMs)) return true;
+
+  return alertMs >= cutoffMs;
+}
+
+function storeAlert(alert, isLiveWebhook = false) {
+  if (!isAlertAllowedByIngestSince(alert, isLiveWebhook)) {
+    const rawTs = alert?.timestamp || alert?.receivedAt || alert?.['@timestamp'];
+    const cutoffStr = getEffectiveIngestCutoff();
+    console.log(`[AEGIS] Alert skipped: event time (${rawTs}) is before activation start (${cutoffStr})`);
+    return false;
+  }
   const useCase = alert.aegis_use_case;
   if (!VALID_USE_CASES.has(useCase)) return false;
   store[useCase].unshift(alert);
@@ -344,7 +481,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (!body.receivedAt) body.receivedAt = new Date().toISOString();
-    const stored = storeAlert(body);
+    const stored = storeAlert(body, true);
     if (!stored) return json(res, 400, { error: 'Failed to store alert' });
     sseBroadcast('alert', { useCase: body.aegis_use_case, alert: body });
     console.log(`[AEGIS] Webhook: ${body.aegis_use_case} | rule=${body.rule?.id} | level=${body.rule?.level} | agent=${body.agent?.name}`);
@@ -430,9 +567,141 @@ const server = http.createServer(async (req, res) => {
   }
 
   /* ══════════════════════════════════════════════════════════
+     POST /api/db/clean — selective database storage cleanup
+  ══════════════════════════════════════════════════════════ */
+  if (pathname === '/api/db/clean' && method === 'POST') {
+    if (!isAdminIpAllowed(remoteIp)) return denyAdminIp(res, remoteIp);
+    if (!enforceRateLimit(`db_clean:${remoteIp}`, 60000, 20)) return;
+
+    let body;
+    try { body = JSON.parse(await readBody(req)); } catch { return json(res, 400, { ok: false, error: 'Invalid JSON' }); }
+
+    const {
+      olderThanDays,
+      beforeDate,
+      categories = 'all',
+      cleanLogs = [],
+      clearAll = false,
+      dryRun = false,
+    } = body;
+
+    let cutoffMs = null;
+    if (typeof olderThanDays === 'number' && olderThanDays > 0) {
+      cutoffMs = Date.now() - (olderThanDays * 24 * 60 * 60 * 1000);
+    } else if (beforeDate) {
+      const parsed = new Date(beforeDate).getTime();
+      if (!isNaN(parsed)) cutoffMs = parsed;
+    }
+
+    const targetCategories = (categories === 'all' || !Array.isArray(categories))
+      ? Object.keys(store)
+      : categories.filter(c => c in store);
+
+    let totalDeleted = 0;
+    let bytesFreedEst = 0;
+    const categoryStats = {};
+    const updatedCategories = {};
+
+    for (const cat of targetCategories) {
+      const currentList = store[cat] || [];
+      let toKeep = [];
+      let toRemove = [];
+
+      if (clearAll) {
+        toRemove = currentList;
+        toKeep = [];
+      } else if (cutoffMs !== null) {
+        for (const item of currentList) {
+          const ts = item.timestamp || item.receivedAt || item['@timestamp'];
+          const t = ts ? new Date(ts).getTime() : 0;
+          if (!isNaN(t) && t < cutoffMs) {
+            toRemove.push(item);
+          } else {
+            toKeep.push(item);
+          }
+        }
+      } else {
+        toKeep = currentList;
+      }
+
+      const catFreed = Buffer.byteLength(JSON.stringify(toRemove), 'utf8');
+      bytesFreedEst += catFreed;
+      totalDeleted += toRemove.length;
+
+      categoryStats[cat] = {
+        deleted: toRemove.length,
+        remaining: toKeep.length,
+        bytesFreedEst: catFreed,
+      };
+
+      if (!dryRun) {
+        store[cat] = toKeep;
+        updatedCategories[cat] = toKeep.length;
+      }
+    }
+
+    // Handle log file cleaning
+    const logsCleanedList = [];
+    const logFilePaths = {
+      serverLog: path.join(__dirname, 'server.log'),
+      serverErr: path.join(__dirname, 'server.err'),
+    };
+
+    const targetLogs = Array.isArray(cleanLogs) ? cleanLogs : [];
+    for (const logKey of targetLogs) {
+      if (logKey === 'auditLog') {
+        if (!dryRun) {
+          await clearAuditLogs().catch(() => {});
+        }
+        logsCleanedList.push('auditLog');
+      } else if (logFilePaths[logKey]) {
+        const filePath = logFilePaths[logKey];
+        try {
+          if (fs.existsSync(filePath)) {
+            const stat = fs.statSync(filePath);
+            bytesFreedEst += stat.size;
+            if (!dryRun) {
+              fs.writeFileSync(filePath, '', 'utf8');
+            }
+            logsCleanedList.push(logKey);
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (!dryRun) {
+      _saveStore(true);
+      sseBroadcast('sync-done', { accepted: 0, categories: Object.fromEntries(Object.entries(store).map(([k, v]) => [k, v.length])) });
+      logAudit({
+        user: req.headers['x-aegis-user'] || 'browser',
+        action: 'storage_cleanup',
+        filename: 'aegis.store.json',
+        before: `Deleted: ${totalDeleted} records`,
+        after: `Freed ~${Math.round(bytesFreedEst / 1024)} KB across ${targetCategories.length} categories`,
+      }).catch(() => {});
+      console.log(`[AEGIS] Storage cleanup executed: ${totalDeleted} records removed, ~${Math.round(bytesFreedEst / 1024)} KB freed.`);
+    }
+
+    let remainingTotal = 0;
+    for (const v of Object.values(store)) remainingTotal += v.length;
+
+    return json(res, 200, {
+      ok: true,
+      dryRun: !!dryRun,
+      cutoffDate: cutoffMs ? new Date(cutoffMs).toISOString() : null,
+      deletedCount: totalDeleted,
+      bytesFreedEst,
+      remainingTotal,
+      categories: categoryStats,
+      logsCleaned: logsCleanedList,
+    });
+  }
+
+
+  /* ══════════════════════════════════════════════════════════
      GET /api/db-stats — middleware database size & health info
   ══════════════════════════════════════════════════════════ */
-  if (pathname === '/api/db-stats' && method === 'GET') {
+  if ((pathname === '/api/db-stats' || pathname === '/api/db/stats') && method === 'GET') {
     _loadStore();
     const getFileStat = (filePath) => {
       try {
@@ -475,6 +744,9 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, {
       ok: true,
       generatedAt: new Date().toISOString(),
+      ingestSince: _config.ingestSince || 'auto',
+      effectiveIngestSince: getEffectiveIngestCutoff(),
+      serviceBootTime: _serviceBootTime,
       store: {
         path: STORE_FILE,
         fileSize: storeStat.size,
@@ -523,20 +795,27 @@ const server = http.createServer(async (req, res) => {
     let body;
     try { body = JSON.parse(await readBody(req)); } catch { return json(res, 400, { error: 'Invalid JSON' }); }
 
-    const beforeSnapshot = JSON.stringify({ webhookSecretSet: !!_config.webhookSecret });
+    const beforeSnapshot = JSON.stringify({ webhookSecretSet: !!_config.webhookSecret, ingestSince: _config.ingestSince });
     if (typeof body.webhookSecret === 'string') _config.webhookSecret = body.webhookSecret;
+    if (typeof body.ingestSince === 'string') _config.ingestSince = body.ingestSince.trim();
     try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(_config, null, 2), 'utf8'); } catch (e) { return json(res, 500, { error: 'Could not save config', detail: e.message }); }
-    const afterSnapshot = JSON.stringify({ webhookSecretSet: !!_config.webhookSecret });
+    const afterSnapshot = JSON.stringify({ webhookSecretSet: !!_config.webhookSecret, ingestSince: _config.ingestSince });
     logAudit({ user: req.headers['x-aegis-user'] || 'browser', action: 'config_update', filename: 'aegis.config.json', before: beforeSnapshot, after: afterSnapshot }).catch(() => {});
-    console.log('[AEGIS] Config updated');
-    return json(res, 200, { ok: true });
+    console.log(`[AEGIS] Config updated (ingestSince: ${_config.ingestSince})`);
+    return json(res, 200, { ok: true, ingestSince: _config.ingestSince, effectiveIngestSince: getEffectiveIngestCutoff() });
   }
 
   /* ══════════════════════════════════════════════════════════
      GET /api/config
   ══════════════════════════════════════════════════════════ */
   if (pathname === '/api/config' && method === 'GET') {
-    return json(res, 200, { webhookSecretSet: !!_config.webhookSecret, devMode: !_config.webhookSecret });
+    return json(res, 200, {
+      webhookSecretSet: !!_config.webhookSecret,
+      devMode: !_config.webhookSecret,
+      ingestSince: _config.ingestSince || 'auto',
+      effectiveIngestSince: getEffectiveIngestCutoff(),
+      serviceBootTime: _serviceBootTime,
+    });
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -730,35 +1009,153 @@ const server = http.createServer(async (req, res) => {
 
     if (issue?.id) {
       const issueUrl = `${(_config.redmineUrl || '').replace(/\/+$/, '')}/issues/${issue.id}`;
+      const statusName = issue.status?.name || 'Updated';
+      const isClosed = issue.status?.is_closed || /closed|resolved|fixed|แก้แล้ว|เสร็จสิ้น/i.test(statusName);
+
+      if (isClosed) {
+        let targetDevice = 'Unknown Device';
+        let targetFile = '';
+        let ruleId = '';
+        const desc = issue.description || '';
+        const devMatch = desc.match(/\*Device \/ Agent:\*\s*([^\n\r]+)/i) || (issue.subject || '').match(/on\s+([a-zA-Z0-9_.-]+)/i);
+        if (devMatch) targetDevice = devMatch[1].trim();
+
+        const fileMatch = desc.match(/\*Target File \/ Path:\*\s*([^\n\r]+)/i) || (issue.subject || '').match(/\(([^)]+\.[a-zA-Z0-9_-]+)\)/i);
+        if (fileMatch) targetFile = fileMatch[1].trim();
+
+        const ruleMatch = desc.match(/\*Rule ID:\*\s*([^\n\r]+)/i) || (issue.subject || '').match(/Rule\s*#?([0-9]+)/i);
+        if (ruleMatch) ruleId = ruleMatch[1].trim();
+
+        await addResolvedRecord({
+          id: `res-redmine-${issue.id}`,
+          issueId: issue.id,
+          subject: issue.subject,
+          status: statusName,
+          statusId: issue.status?.id || 5,
+          priority: issue.priority?.name || 'Normal',
+          closedBy: author,
+          closedAt: issue.closed_on || issue.updated_on || new Date().toISOString(),
+          targetDevice,
+          targetFile,
+          ruleId,
+          resolutionNotes: body.journal?.notes || issue.description || 'Closed in Redmine',
+          issueUrl,
+          description: desc,
+        }).catch(() => {});
+      }
+
       await logAudit({
         user: author,
         action: 'redmine_fix_synced',
         filename: `Redmine Issue #${issue.id}`,
         before: `Issue ${action}: ${issue.subject || ''}`,
-        after: `Status: ${issue.status?.name || 'Updated'}\nURL: ${issueUrl}\nNotes: ${body.journal?.notes || issue.description || ''}`,
+        after: `Status: ${statusName}\nURL: ${issueUrl}\nNotes: ${body.journal?.notes || issue.description || ''}`,
       }).catch(() => {});
-      console.log(`[Redmine Webhook] Synced issue #${issue.id} (${action})`);
+      console.log(`[Redmine Webhook] Synced issue #${issue.id} (${action} -> ${statusName})`);
     }
 
     return json(res, 200, { ok: true, message: 'Webhook received' });
   }
 
   /* ══════════════════════════════════════════════════════════
+     RESOLVED VULNERABILITIES & CLOSED ISSUES HISTORY API
+  ══════════════════════════════════════════════════════════ */
+
+  /* GET /api/resolved-history — list all resolved vulnerability records */
+  if (pathname === '/api/resolved-history' && method === 'GET') {
+    const search = url.searchParams.get('search') || '';
+    const limit  = parseInt(url.searchParams.get('limit') || '500', 10);
+    try {
+      const records = await getResolvedHistory({ search, limit });
+      return json(res, 200, { ok: true, count: records.length, records });
+    } catch (e) {
+      return json(res, 500, { ok: false, error: e.message });
+    }
+  }
+
+  /* POST /api/resolved-history/sync — sync closed issues from Redmine */
+  if (pathname === '/api/resolved-history/sync' && method === 'POST') {
+    if (!isAdminIpAllowed(remoteIp)) return denyAdminIp(res, remoteIp);
+    if (!enforceRateLimit(`resolved_sync:${remoteIp}`, 60000, 15)) return;
+
+    try {
+      const result = await syncClosedIssuesFromRedmine(_config);
+      return json(res, result.ok ? 200 : 400, result);
+    } catch (e) {
+      return json(res, 500, { ok: false, error: e.message });
+    }
+  }
+
+  /* DELETE /api/resolved-history — delete single, multiple (batch), or all resolved records */
+  if (pathname === '/api/resolved-history' && method === 'DELETE') {
+    if (!isAdminIpAllowed(remoteIp)) return denyAdminIp(res, remoteIp);
+    if (!enforceRateLimit(`resolved_del:${remoteIp}`, 60000, 20)) return;
+
+    let body = {};
+    try {
+      const raw = await readBody(req);
+      if (raw) body = JSON.parse(raw);
+    } catch (_) {}
+
+    const singleId = url.searchParams.get('id');
+    const queryIds = url.searchParams.get('ids');
+    let targetIds = [];
+
+    if (Array.isArray(body.ids) && body.ids.length > 0) {
+      targetIds = body.ids;
+    } else if (queryIds) {
+      targetIds = queryIds.split(',').map(s => s.trim()).filter(Boolean);
+    } else if (singleId) {
+      targetIds = [singleId];
+    }
+
+    try {
+      if (targetIds.length === 1) {
+        const deleted = await deleteResolvedRecord(targetIds[0]);
+        return json(res, 200, { ok: true, deleted, deletedCount: deleted ? 1 : 0, message: `Deleted record ${targetIds[0]}` });
+      } else if (targetIds.length > 1) {
+        const count = await deleteMultipleResolvedRecords(targetIds);
+        return json(res, 200, { ok: true, deletedCount: count, message: `Deleted ${count} resolved records` });
+      } else {
+        await clearResolvedHistory();
+        return json(res, 200, { ok: true, message: 'All resolved vulnerability history cleared' });
+      }
+    } catch (e) {
+      return json(res, 500, { ok: false, error: e.message });
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════
      SSH TUNNEL STATUS & CONTROL ENDPOINTS
+     GET    /api/tunnel  → current status
+     POST   /api/tunnel  → start tunnel (uses config: sshHost, sshUser)
+     DELETE /api/tunnel  → stop tunnel
   ══════════════════════════════════════════════════════════ */
   if (pathname === '/api/tunnel') {
     if (method === 'GET') {
       return json(res, 200, { ok: true, running: _tunnelState.running, info: _tunnelState });
     }
+
     if (method === 'POST') {
-      _tunnelState.running = true;
-      _tunnelState.startedAt = new Date().toISOString();
-      return json(res, 200, { ok: true, running: true, message: 'Tunnel opened' });
+      const host       = _config.sshHost;
+      const user       = _config.sshUser;
+      const remotePort = parseInt(_config.sshRemotePort || PORT, 10);
+
+      if (!host || !user) {
+        return json(res, 400, { ok: false, error: 'sshHost and sshUser must be set in Settings before opening a tunnel.' });
+      }
+
+      if (_tunnelProcess) {
+        return json(res, 200, { ok: true, running: true, message: 'Tunnel already running', info: _tunnelState });
+      }
+
+      _startTunnel(host, user, remotePort);
+      return json(res, 200, { ok: true, running: true, message: `Tunnel connecting → ${user}@${host} (remote port ${remotePort})`, info: _tunnelState });
     }
+
     if (method === 'DELETE') {
-      _tunnelState.running = false;
-      _tunnelState.startedAt = null;
-      return json(res, 200, { ok: true, running: false, message: 'Tunnel closed' });
+      _stopTunnel();
+      return json(res, 200, { ok: true, running: false, message: 'Tunnel stopped' });
     }
   }
 
@@ -911,6 +1308,13 @@ server.listen(PORT, () => {
   console.log(`║  Secret:       ${_config.webhookSecret ? '*** configured ***' : 'NOT SET (dev mode)'}              ║`);
   console.log('╚══════════════════════════════════════════════════╝');
   console.log('');
+
+  // Auto-start SSH tunnel if configured
+  if (_config.sshAutoTunnel && _config.sshHost && _config.sshUser) {
+    const remotePort = parseInt(_config.sshRemotePort || PORT, 10);
+    console.log(`[AEGIS Tunnel] Auto-start enabled → ${_config.sshUser}@${_config.sshHost} (remote port ${remotePort})`);
+    _startTunnel(_config.sshHost, _config.sshUser, remotePort);
+  }
 });
 
 server.on('error', (e) => {

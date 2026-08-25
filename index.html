@@ -1572,8 +1572,8 @@
           <div class="db-view-header-left">
             <div class="db-header-icon"><i data-lucide="database"></i></div>
             <div>
-              <h1 class="db-view-title">Database Storage</h1>
-              <p class="db-view-subtitle">Middleware data store usage &amp; health</p>
+              <h1 class="db-view-title">Database Storage &amp; Cleanup</h1>
+              <p class="db-view-subtitle">Middleware data store usage, log management &amp; storage cleanup</p>
             </div>
           </div>
           <div class="db-view-header-right">
@@ -1582,6 +1582,94 @@
               <i data-lucide="refresh-cw"></i>
               Refresh
             </button>
+          </div>
+        </div>
+
+        <!-- Ingestion Activation Date Banner -->
+        <div class="db-activation-banner">
+          <div class="db-activation-icon"><i data-lucide="shield-check"></i></div>
+          <div class="db-activation-content">
+            <div class="db-activation-title">
+              <span class="db-activation-dot"></span>
+              <span>Ingestion Active Since:</span>
+              <strong id="db-ingest-since-display">25 ส.ค. 2569, 06:00 น.</strong>
+            </div>
+            <p class="db-activation-sub">
+              ระบบเริ่มบันทึกและรับเฉพาะข้อมูล Alert ที่เกิดขึ้นตั้งแต่วันที่และเวลาเปิดใช้งานนี้เป็นต้นไปอย่างต่อเนื่อง (กรองข้อมูลเก่าก่อนหน้านี้ออกอัตโนมัติ)
+            </p>
+          </div>
+          <button id="db-edit-ingest-since-btn" class="db-activation-btn" title="Edit Activation Date & Time">
+            <i data-lucide="calendar-cog"></i>
+            Change Start Time
+          </button>
+        </div>
+
+        <!-- Quick Cleanup Presets (PC / Mobile Storage Clean style) -->
+        <div class="db-clean-presets-wrap">
+          <div class="db-clean-presets-header">
+            <div class="db-clean-presets-title">
+              <i data-lucide="sparkles"></i>
+              <span>Quick Storage Clean — ล้างข้อมูลพื้นที่จัดเก็บด่วน</span>
+            </div>
+            <span class="db-clean-presets-sub">One-click cleanup presets similar to mobile/PC storage manager</span>
+          </div>
+
+          <div class="db-quick-clean-grid">
+            <!-- 30 Days Preset (Last Month) -->
+            <div class="db-quick-card db-quick-card--month" id="btn-quick-clean-30d" role="button" tabindex="0">
+              <div class="db-quick-card-icon"><i data-lucide="calendar-x-2"></i></div>
+              <div class="db-quick-card-info">
+                <span class="db-quick-card-name">Older than 1 Month</span>
+                <span class="db-quick-card-desc">ลบข้อมูลเดือนที่แล้ว (&gt; 30 วัน)</span>
+                <span class="db-quick-card-badge" id="badge-count-30d">Calculating…</span>
+              </div>
+              <button class="db-quick-action-btn" title="Clean data older than 30 days">
+                <i data-lucide="trash-2"></i>
+                Clean 30d
+              </button>
+            </div>
+
+            <!-- 7 Days Preset -->
+            <div class="db-quick-card db-quick-card--week" id="btn-quick-clean-7d" role="button" tabindex="0">
+              <div class="db-quick-card-icon"><i data-lucide="calendar-clock"></i></div>
+              <div class="db-quick-card-info">
+                <span class="db-quick-card-name">Older than 7 Days</span>
+                <span class="db-quick-card-desc">ลบข้อมูลเก่ากว่า 7 วัน</span>
+                <span class="db-quick-card-badge" id="badge-count-7d">Calculating…</span>
+              </div>
+              <button class="db-quick-action-btn" title="Clean data older than 7 days">
+                <i data-lucide="trash-2"></i>
+                Clean 7d
+              </button>
+            </div>
+
+            <!-- 90 Days Preset -->
+            <div class="db-quick-card db-quick-card--quarter" id="btn-quick-clean-90d" role="button" tabindex="0">
+              <div class="db-quick-card-icon"><i data-lucide="history"></i></div>
+              <div class="db-quick-card-info">
+                <span class="db-quick-card-name">Older than 3 Months</span>
+                <span class="db-quick-card-desc">ลบข้อมูลเก่ากว่า 90 วัน</span>
+                <span class="db-quick-card-badge" id="badge-count-90d">Calculating…</span>
+              </div>
+              <button class="db-quick-action-btn" title="Clean data older than 90 days">
+                <i data-lucide="trash-2"></i>
+                Clean 90d
+              </button>
+            </div>
+
+            <!-- Logs Cleanup Preset -->
+            <div class="db-quick-card db-quick-card--logs" id="btn-quick-clean-logs" role="button" tabindex="0">
+              <div class="db-quick-card-icon"><i data-lucide="file-minus-2"></i></div>
+              <div class="db-quick-card-info">
+                <span class="db-quick-card-name">Purge Log Files</span>
+                <span class="db-quick-card-desc">ล้าง Server &amp; Error Logs</span>
+                <span class="db-quick-card-badge" id="badge-size-logs">—</span>
+              </div>
+              <button class="db-quick-action-btn" title="Clear server and error log files">
+                <i data-lucide="eraser"></i>
+                Purge Logs
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1654,6 +1742,135 @@
 
         </div><!-- /db-grid -->
 
+        <!-- Custom Storage Cleaner & Pruning Center -->
+        <div class="db-card db-card--full db-custom-clean-card">
+          <div class="db-card-header">
+            <div class="db-card-header-icon db-card-header-icon--danger"><i data-lucide="sliders-horizontal"></i></div>
+            <div>
+              <h2 class="db-card-title">Custom Storage Cleaner &amp; Pruning Center</h2>
+              <p class="db-card-subtitle">Selectively purge alert data by date range, categories, or log types</p>
+            </div>
+          </div>
+          <div class="db-card-body db-custom-clean-body">
+
+            <!-- Step 1: Time Horizon Selection -->
+            <div class="db-clean-form-row">
+              <label class="db-clean-section-label">
+                <i data-lucide="clock-rewind"></i>
+                1. Select Time Range / ช่วงเวลาข้อมูลที่จะลบ
+              </label>
+              <div class="db-time-pills" id="db-time-pills">
+                <button type="button" class="db-time-pill" data-days="7">Older than 7 Days</button>
+                <button type="button" class="db-time-pill active" data-days="30">Older than 30 Days (1 Month)</button>
+                <button type="button" class="db-time-pill" data-days="90">Older than 90 Days (3 Months)</button>
+                <button type="button" class="db-time-pill" data-days="180">Older than 180 Days</button>
+                <button type="button" class="db-time-pill" data-days="custom">Custom Date Cutoff</button>
+                <button type="button" class="db-time-pill db-time-pill--danger" data-days="all">Clear All Data (ล้างทั้งหมด)</button>
+              </div>
+
+              <!-- Custom Date Picker Wrap (hidden by default) -->
+              <div class="db-custom-date-wrap" id="db-custom-date-wrap" style="display:none;">
+                <label for="db-custom-date-input" class="db-sub-label">Delete records before / ลบข้อมูลที่เกิดก่อนวันที่:</label>
+                <div class="db-date-input-wrap">
+                  <input type="datetime-local" id="db-custom-date-input" class="db-date-input" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 2: Target Categories & Logs -->
+            <div class="db-clean-form-row">
+              <label class="db-clean-section-label">
+                <i data-lucide="check-square"></i>
+                2. Target Categories &amp; Logs / หมวดหมู่และไฟล์ที่ต้องการลบ
+              </label>
+              
+              <div class="db-check-selection-grid">
+                <!-- Categories Block -->
+                <div class="db-check-block">
+                  <div class="db-check-block-title">
+                    <span>Alert Categories</span>
+                    <button type="button" class="db-select-all-btn" id="db-toggle-all-cats">Deselect All</button>
+                  </div>
+                  <div class="db-checkbox-list" id="db-category-checkboxes">
+                    <label class="db-checkbox-item">
+                      <input type="checkbox" name="db_cat" value="critical_alerts" checked />
+                      <span class="db-checkbox-custom" style="--cat-color: #f4576a;"></span>
+                      <span class="db-checkbox-label">Critical Alerts (Level &ge; 7)</span>
+                    </label>
+                    <label class="db-checkbox-item">
+                      <input type="checkbox" name="db_cat" value="blind_spots_agent_health" checked />
+                      <span class="db-checkbox-custom" style="--cat-color: #f97316;"></span>
+                      <span class="db-checkbox-label">Device Names &amp; Health</span>
+                    </label>
+                    <label class="db-checkbox-item">
+                      <input type="checkbox" name="db_cat" value="critical_file_changes" checked />
+                      <span class="db-checkbox-custom" style="--cat-color: #f5b94d;"></span>
+                      <span class="db-checkbox-label">Critical File &amp; System Changes</span>
+                    </label>
+                    <label class="db-checkbox-item">
+                      <input type="checkbox" name="db_cat" value="auth_access_anomalies" checked />
+                      <span class="db-checkbox-custom" style="--cat-color: #22d3ee;"></span>
+                      <span class="db-checkbox-label">Access &amp; Auth Anomalies</span>
+                    </label>
+                    <label class="db-checkbox-item">
+                      <input type="checkbox" name="db_cat" value="threat_intel_matches" checked />
+                      <span class="db-checkbox-custom" style="--cat-color: #a78bfa;"></span>
+                      <span class="db-checkbox-label">Threat Intelligence Matches</span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Logs Block -->
+                <div class="db-check-block">
+                  <div class="db-check-block-title">
+                    <span>Log Files &amp; History</span>
+                  </div>
+                  <div class="db-checkbox-list">
+                    <label class="db-checkbox-item">
+                      <input type="checkbox" name="db_log" value="serverLog" />
+                      <span class="db-checkbox-custom" style="--cat-color: #2dd4a7;"></span>
+                      <span class="db-checkbox-label">Server Console Log (server.log)</span>
+                    </label>
+                    <label class="db-checkbox-item">
+                      <input type="checkbox" name="db_log" value="serverErr" />
+                      <span class="db-checkbox-custom" style="--cat-color: #f4576a;"></span>
+                      <span class="db-checkbox-label">Server Error Log (server.err)</span>
+                    </label>
+                    <label class="db-checkbox-item">
+                      <input type="checkbox" name="db_log" value="auditLog" />
+                      <span class="db-checkbox-custom" style="--cat-color: #f5b94d;"></span>
+                      <span class="db-checkbox-label">Audit Trail Log (audit.log.ndjson)</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Live Calculation & Action Bar -->
+            <div class="db-clean-action-bar">
+              <div class="db-impact-preview" id="db-impact-preview">
+                <div class="db-impact-icon"><i data-lucide="info"></i></div>
+                <div class="db-impact-info">
+                  <span class="db-impact-primary" id="db-impact-primary">Ready to calculate cleanup impact</span>
+                  <span class="db-impact-secondary" id="db-impact-secondary">Select options above to preview items to be purged</span>
+                </div>
+              </div>
+
+              <div class="db-clean-action-btns">
+                <button type="button" id="db-preview-clean-btn" class="db-btn db-btn--secondary">
+                  <i data-lucide="eye"></i>
+                  Recalculate Impact
+                </button>
+                <button type="button" id="db-execute-clean-btn" class="db-btn db-btn--danger">
+                  <i data-lucide="trash-2"></i>
+                  Execute Cleanup…
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
         <!-- Record Timeline Card -->
         <div class="db-card db-card--full">
           <div class="db-card-header">
@@ -1708,83 +1925,186 @@
 
       </div><!-- /view-storage -->
 
+      <!-- ── Database Cleanup Confirmation Modal ──────────────── -->
+      <div id="db-clean-modal" class="db-clean-modal" role="dialog" aria-modal="true" aria-label="Confirm Cleanup" style="display:none;">
+        <div class="db-clean-backdrop" id="db-clean-modal-backdrop"></div>
+        <div class="db-clean-panel">
+          <div class="db-clean-modal-header">
+            <div class="db-clean-modal-title-wrap">
+              <div class="db-clean-modal-icon"><i data-lucide="alert-triangle"></i></div>
+              <div>
+                <h3 class="db-clean-modal-title">Confirm Storage Cleanup</h3>
+                <span class="db-clean-modal-sub">This action permanently deletes selected records from the store.</span>
+              </div>
+            </div>
+            <button id="db-clean-modal-close" class="db-clean-modal-close" aria-label="Close">
+              <i data-lucide="x"></i>
+            </button>
+          </div>
+          <div class="db-clean-modal-body">
+            <div class="db-clean-summary-box">
+              <div class="db-clean-summary-item">
+                <span class="db-summary-label">Target Time Horizon</span>
+                <span class="db-summary-value" id="db-modal-summary-time">—</span>
+              </div>
+              <div class="db-clean-summary-item">
+                <span class="db-summary-label">Target Categories</span>
+                <span class="db-summary-value" id="db-modal-summary-cats">—</span>
+              </div>
+              <div class="db-clean-summary-item">
+                <span class="db-summary-label">Logs to Truncate</span>
+                <span class="db-summary-value" id="db-modal-summary-logs">—</span>
+              </div>
+              <div class="db-clean-summary-item db-clean-summary-item--highlight">
+                <span class="db-summary-label">Estimated Records to Delete</span>
+                <span class="db-summary-value db-summary-value--danger" id="db-modal-summary-count">—</span>
+              </div>
+              <div class="db-clean-summary-item">
+                <span class="db-summary-label">Estimated Space to Free</span>
+                <span class="db-summary-value db-summary-value--ok" id="db-modal-summary-bytes">—</span>
+              </div>
+            </div>
+
+            <p class="db-clean-warning-text">
+              <i data-lucide="shield-alert"></i>
+              การลบข้อมูลนี้เป็นการลบถาวร ไม่สามารถกู้คืนได้ และจะมีการบันทึกเหตุการณ์ลงในระบบ Audit Trail
+            </p>
+          </div>
+          <div class="db-clean-modal-footer">
+            <button type="button" id="db-clean-modal-cancel" class="db-btn db-btn--secondary">Cancel / ยกเลิก</button>
+            <button type="button" id="db-clean-modal-confirm" class="db-btn db-btn--danger">
+              <i data-lucide="trash-2"></i>
+              Confirm &amp; Delete Data
+            </button>
+          </div>
+        </div>
+      </div>
+
+
       <!-- ════════════════════════════════════════════
-           FILE EDIT HISTORY VIEW
+           RESOLVED VULNERABILITIES HISTORY VIEW
       ════════════════════════════════════════════ -->
       <div id="view-history" style="display:none; flex-direction:column; gap:var(--sp-5);">
 
         <!-- Page Header -->
         <div class="fh-header">
           <div class="fh-header-left">
-            <div class="fh-header-icon"><i data-lucide="history"></i></div>
+            <div class="fh-header-icon"><i data-lucide="shield-check"></i></div>
             <div>
-              <h1 class="fh-title">File Edit History</h1>
-              <p class="fh-subtitle">Audit trail of all file changes tracked by the middleware</p>
+              <h1 class="fh-title">Resolved Vulnerabilities History</h1>
+              <p class="fh-subtitle">ประวัติช่องโหว่และไฟล์ที่มีการแก้ไขและกดปิดงานแล้วใน Redmine (เก็บสะสมต่อเนื่องถาวรจนกว่าจะลบเอง)</p>
             </div>
           </div>
           <div class="fh-header-right">
-            <span class="fh-live-badge"><span class="fh-live-dot"></span>Live</span>
+            <button id="fh-sync-redmine-btn" class="fh-sync-btn" title="Sync closed issues from Redmine">
+              <i data-lucide="refresh-cw"></i>
+              Sync from Redmine
+            </button>
             <span class="fh-last-updated" id="fh-last-updated">—</span>
             <button id="fh-refresh-btn" class="fh-refresh-btn" aria-label="Refresh history">
-              <i data-lucide="refresh-cw"></i>
+              <i data-lucide="rotate-cw"></i>
               Refresh
             </button>
           </div>
         </div>
 
+        <!-- Stats Row -->
+        <div class="fh-stats-row">
+          <div class="fh-stat-card fh-stat--total">
+            <div class="fh-stat-icon"><i data-lucide="check-check"></i></div>
+            <div class="fh-stat-body">
+              <span class="fh-stat-label">Total Resolved</span>
+              <span class="fh-stat-value" id="fh-stat-total">0</span>
+            </div>
+          </div>
+          <div class="fh-stat-card fh-stat--created">
+            <div class="fh-stat-icon"><i data-lucide="shield-alert"></i></div>
+            <div class="fh-stat-body">
+              <span class="fh-stat-label">Critical / High Fixes</span>
+              <span class="fh-stat-value" id="fh-stat-crit">0</span>
+            </div>
+          </div>
+          <div class="fh-stat-card fh-stat--updated">
+            <div class="fh-stat-icon"><i data-lucide="server"></i></div>
+            <div class="fh-stat-body">
+              <span class="fh-stat-label">Devices Protected</span>
+              <span class="fh-stat-value" id="fh-stat-devices">0</span>
+            </div>
+          </div>
+          <div class="fh-stat-card fh-stat--deleted">
+            <div class="fh-stat-icon"><i data-lucide="file-code-2"></i></div>
+            <div class="fh-stat-body">
+              <span class="fh-stat-label">Files Patched</span>
+              <span class="fh-stat-value" id="fh-stat-files">0</span>
+            </div>
+          </div>
+          <div class="fh-stat-card fh-stat--other">
+            <div class="fh-stat-icon"><i data-lucide="calendar-check"></i></div>
+            <div class="fh-stat-body">
+              <span class="fh-stat-label">This Month</span>
+              <span class="fh-stat-value" id="fh-stat-month">0</span>
+            </div>
+          </div>
+        </div>
 
-
-        <!-- Toolbar: Search + Filter + Export -->
+        <!-- Toolbar: Search + Priority Filter + Clear -->
         <div class="fh-toolbar">
           <div class="fh-search-wrap">
             <i data-lucide="search" class="fh-search-icon"></i>
             <input type="search" id="fh-search" class="fh-search-input"
-                   placeholder="Search filename, user, action…" autocomplete="off" />
+                   placeholder="Search vulnerability subject, file path, device, fixer, issue #…" autocomplete="off" />
           </div>
           <div class="fh-filter-group">
-            <select id="fh-filter-action" class="fh-select" aria-label="Filter by action">
-              <option value="">All Actions</option>
-              <option value="rule_created">Rule Created</option>
-              <option value="rule_updated">Rule Updated</option>
-              <option value="rule_deleted">Rule Deleted</option>
-              <option value="redmine_issue_created">Redmine Issue Created</option>
-              <option value="redmine_fix_synced">Redmine Fix Synced</option>
-              <option value="config_update">Config Changed</option>
-              <option value="data_cleared">Data Cleared</option>
-            </select>
-            <select id="fh-filter-limit" class="fh-select" aria-label="Limit">
-              <option value="50">Last 50</option>
-              <option value="100">Last 100</option>
-              <option value="200" selected>Last 200</option>
-              <option value="500">Last 500</option>
+            <select id="fh-filter-priority" class="fh-select" aria-label="Filter by priority">
+              <option value="">All Priorities</option>
+              <option value="Immediate">Immediate</option>
+              <option value="Urgent">Urgent</option>
+              <option value="High">High</option>
+              <option value="Normal">Normal</option>
+              <option value="Low">Low</option>
             </select>
           </div>
-          <button id="fh-clear-btn" class="fh-danger-btn" title="Clear all audit history">
+
+          <!-- Batch selection action bar (visible when items checked) -->
+          <div id="fh-batch-bar" class="fh-batch-bar" style="display:none;">
+            <span class="fh-batch-text"><strong id="fh-selected-count">0</strong> selected</span>
+            <button id="fh-delete-selected-btn" class="fh-danger-btn fh-danger-btn--solid" title="Delete selected items">
+              <i data-lucide="trash-2"></i>
+              Delete Selected (<span id="fh-selected-btn-count">0</span>)
+            </button>
+            <button id="fh-deselect-all-btn" class="fh-btn-ghost" title="Deselect all">Cancel</button>
+          </div>
+
+          <button id="fh-clear-btn" class="fh-danger-btn" title="Clear all resolved vulnerability history">
             <i data-lucide="trash-2"></i>
-            Clear History
+            Clear All History
           </button>
         </div>
 
-        <!-- Timeline Table -->
+        <!-- Resolved Vulnerabilities Table Card -->
         <div class="fh-card">
           <div class="fh-card-header">
-            <div class="fh-card-header-icon"><i data-lucide="git-branch"></i></div>
+            <div class="fh-card-header-icon"><i data-lucide="history"></i></div>
             <div>
-              <h2 class="fh-card-title">Audit Trail</h2>
-              <p class="fh-card-subtitle">Chronological log of all file and configuration changes</p>
+              <h2 class="fh-card-title">Resolved Security Issues Log</h2>
+              <p class="fh-card-subtitle">รายการช่องโหว่และไฟล์ที่ดำเนินการแก้ไขและปิดงานแล้ว (สามารถติ๊กเลือกเพื่อลบทีละหลายรายการได้)</p>
             </div>
-            <span class="fh-row-count" id="fh-row-count">0 entries</span>
+            <span class="fh-row-count" id="fh-row-count">0 resolved issues</span>
           </div>
           <div class="fh-table-wrap">
-            <table class="fh-table" role="grid" aria-label="File Edit History">
+            <table class="fh-table" role="grid" aria-label="Resolved Vulnerabilities History">
               <thead>
                 <tr>
-                  <th class="fh-th fh-th--ts">Timestamp</th>
-                  <th class="fh-th fh-th--action">Action</th>
-                  <th class="fh-th fh-th--file">Filename</th>
-                  <th class="fh-th fh-th--user">User</th>
-                  <th class="fh-th fh-th--detail">Detail</th>
-                  <th class="fh-th fh-th--expand"></th>
+                  <th class="fh-th fh-th--check">
+                    <input type="checkbox" id="fh-check-all" class="fh-custom-checkbox" title="Select all visible" />
+                  </th>
+                  <th class="fh-th fh-th--ts">Closed Date</th>
+                  <th class="fh-th fh-th--issue">Redmine Issue</th>
+                  <th class="fh-th fh-th--subject">Vulnerability Subject</th>
+                  <th class="fh-th fh-th--target">Target Device / File</th>
+                  <th class="fh-th fh-th--user">Closed By</th>
+                  <th class="fh-th fh-th--detail">Resolution Notes</th>
+                  <th class="fh-th fh-th--actions">Action</th>
                 </tr>
               </thead>
               <tbody id="fh-table-body">
@@ -1793,23 +2113,23 @@
             </table>
             <!-- Empty / loading states -->
             <div id="fh-empty" class="fh-empty-state" style="display:none;">
-              <i data-lucide="inbox"></i>
-              <span>No history records found</span>
+              <i data-lucide="check-circle-2"></i>
+              <span>No resolved vulnerability history found</span>
             </div>
             <div id="fh-loading" class="fh-loading-state" style="display:none;">
               <div class="fh-spinner"></div>
-              <span>Loading history…</span>
+              <span>Loading resolved history…</span>
             </div>
           </div>
         </div>
 
-        <!-- Diff Modal (hidden, shown on row expand) -->
-        <div id="fh-diff-modal" class="fh-diff-modal" role="dialog" aria-modal="true" aria-label="Change details" style="display:none;">
+        <!-- Vulnerability Detail Modal -->
+        <div id="fh-diff-modal" class="fh-diff-modal" role="dialog" aria-modal="true" aria-label="Vulnerability Details" style="display:none;">
           <div class="fh-diff-backdrop" id="fh-diff-backdrop"></div>
           <div class="fh-diff-panel">
             <div class="fh-diff-header">
               <div class="fh-diff-title-wrap">
-                <div class="fh-diff-icon"><i data-lucide="diff"></i></div>
+                <div class="fh-diff-icon"><i data-lucide="shield-check"></i></div>
                 <div>
                   <h3 class="fh-diff-title" id="fh-diff-filename">—</h3>
                   <span class="fh-diff-meta" id="fh-diff-meta">—</span>
@@ -1819,14 +2139,14 @@
                 <i data-lucide="x"></i>
               </button>
             </div>
-            <div class="fh-diff-body">
+            <div class="fh-diff-body" style="grid-template-columns: 1fr 4px 1fr;">
               <div class="fh-diff-col">
-                <div class="fh-diff-col-label fh-diff-col-label--before"><i data-lucide="minus-circle"></i> Before</div>
+                <div class="fh-diff-col-label fh-diff-col-label--before"><i data-lucide="alert-circle"></i> Vulnerability &amp; Alert Description</div>
                 <pre class="fh-diff-pre fh-diff-pre--before" id="fh-diff-before"></pre>
               </div>
               <div class="fh-diff-divider"></div>
               <div class="fh-diff-col">
-                <div class="fh-diff-col-label fh-diff-col-label--after"><i data-lucide="plus-circle"></i> After</div>
+                <div class="fh-diff-col-label fh-diff-col-label--after"><i data-lucide="check-circle-2"></i> Resolution &amp; Fix Notes</div>
                 <pre class="fh-diff-pre fh-diff-pre--after" id="fh-diff-after"></pre>
               </div>
             </div>

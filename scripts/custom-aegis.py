@@ -1,13 +1,11 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
-Aegis SOC — Wazuh Manager Custom Integration Script
-=====================================================
-File location on Wazuh Manager: /var/ossec/integrations/custom-aegis
-Permissions: chmod 750 /var/ossec/integrations/custom-aegis (owner root:wazuh)
+Aegis SOC - Wazuh Manager Custom Integration Script
+File: /var/ossec/integrations/custom-aegis
+Permissions: chmod 750 (owner root:wazuh)
 
-This script is triggered by Wazuh Manager whenever an alert matches rule criteria.
-It filters raw alerts, classifies them into one of the 5 Aegis SOC use cases,
-and sends ONLY qualified alerts to the Aegis Middleware webhook.
+Forwards ALL alerts with level >= 7 from ANY rule to Aegis SOC Middleware.
+Level >= 12 will auto-open a Redmine Issue via the middleware.
 
 Usage (invoked automatically by Wazuh):
   /var/ossec/integrations/custom-aegis <alert_file> <api_key> <hook_url>
@@ -21,7 +19,6 @@ import logging
 import os
 from datetime import datetime, timezone
 
-# ── Logging ────────────────────────────────────────────────────────────────
 LOG_FILE = "/var/ossec/logs/custom-aegis.log"
 logging.basicConfig(
     level=logging.INFO,
@@ -33,21 +30,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger("custom-aegis")
 
-# ── Defaults ───────────────────────────────────────────────────────────────
 DEFAULT_HOOK_URL = "http://127.0.0.1:3000/api/wazuh-webhook"
-MIN_LEVEL        = 3   # Drop alerts with rule.level < 3 immediately
 
-VALID_USE_CASES = {
-    "critical_alerts",
-    "blind_spots_agent_health",
-    "critical_file_changes",
-    "auth_access_anomalies",
-    "threat_intel_matches",
-}
+# Send all alerts level >= 7 from ANY rule.
+# Level >= 12 -> Middleware auto-opens Redmine Issue.
+MIN_LEVEL = 7
 
-# ── Use-case classification keywords (ordered by priority) ──────────────────
 USE_CASE_RULES = [
-    # (use_case, group_keywords)
     ("critical_file_changes", [
         "syscheck", "fim", "file_integrity", "ossec_integrity",
         "file_monitor", "inotify", "auditd_watch",
@@ -56,7 +45,7 @@ USE_CASE_RULES = [
         "authentication", "sshd", "pam", "login", "web",
         "win_authentication", "invalid_login", "brute_force", "invalid_access",
         "authentication_failed", "authentication_success", "logon", "rdp",
-        "ftp_auth", "kerberos", "ntlm", "telnet", "vpn_auth",
+        "ftp_auth", "kerberos", "ntlm", "telnet", "vpn_auth", "fortigate",
     ]),
     ("blind_spots_agent_health", [
         "agent_disconnected", "ossec", "keepalive", "netstat",
@@ -75,42 +64,33 @@ USE_CASE_RULES = [
 
 def classify_use_case(alert):
     """
-    Classify Wazuh alert into one of the 5 Aegis SOC use cases based on rule groups and level.
-
-    Priority order:
-      1. critical_file_changes   (syscheck / FIM)
-      2. auth_access_anomalies   (authentication / SSH / PAM / brute-force)
-      3. blind_spots_agent_health (agent / keepalive / ossec)
-      4. threat_intel_matches    (malware / IDS / CVE exploits)
-      5. critical_alerts         (any rule with level >= 7 that did not match above)
-
-    Returns use case name string, or None if alert does not meet threshold.
+    Classify into 5 Aegis SOC use cases.
+    Every alert >= MIN_LEVEL always gets a use_case (never dropped).
+    Fallback: critical_alerts for any unclassified alert.
     """
     rule   = alert.get("rule", {})
     groups = rule.get("groups", [])
-    level  = int(rule.get("level", 0))
+    desc   = str(rule.get("description", "")).lower()
 
-    if isinstance(groups, list):
-        g = " ".join(str(x) for x in groups).lower()
-    else:
-        g = str(groups).lower()
+    g = " ".join(str(x) for x in groups).lower() if isinstance(groups, list) else str(groups).lower()
 
     for use_case, keywords in USE_CASE_RULES:
         if any(k in g for k in keywords):
             return use_case
 
-    # Fallback: high-severity alerts that did not match a specific category
-    if level >= 7:
-        return "critical_alerts"
+    if any(k in desc for k in ["file added", "file modified", "file deleted", "integrity checksum"]):
+        return "critical_file_changes"
+    if any(k in desc for k in ["failed login", "authentication failed", "invalid user", "brute"]):
+        return "auth_access_anomalies"
+    if any(k in desc for k in ["agent disconnected", "agent stopped", "keepalive"]):
+        return "blind_spots_agent_health"
+    if any(k in desc for k in ["attack", "exploit", "malware", "threat", "sqli", "xss", "ransomware"]):
+        return "threat_intel_matches"
 
-    return None
+    return "critical_alerts"
 
 
 def validate_required_fields(alert):
-    """
-    Lightweight payload schema validation before sending to middleware.
-    Returns a list of missing or invalid fields (empty list = OK).
-    """
     issues = []
     if not (alert.get("timestamp") or alert.get("@timestamp") or alert.get("receivedAt")):
         issues.append("timestamp")
@@ -126,12 +106,10 @@ def validate_required_fields(alert):
 
 
 def send_webhook(hook_url, alert, bearer_secret=""):
-    """POST classified alert to Aegis Middleware webhook."""
     payload = json.dumps(alert).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     if bearer_secret:
         headers["Authorization"] = f"Bearer {bearer_secret}"
-
     req = urllib.request.Request(hook_url, data=payload, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
@@ -156,7 +134,6 @@ def main():
     api_key    = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] != "-" else ""
     hook_url   = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] != "-" else DEFAULT_HOOK_URL
 
-    # ── Read alert JSON generated by Wazuh ────────────────────────────────
     try:
         with open(alert_file, "r", encoding="utf-8") as f:
             alert = json.load(f)
@@ -165,43 +142,30 @@ def main():
         sys.exit(1)
 
     rule_id    = alert.get("rule", {}).get("id", "?")
-    rule_desc  = alert.get("rule", {}).get("description", "")[:60]
+    rule_desc  = alert.get("rule", {}).get("description", "")[:80]
     level      = int(alert.get("rule", {}).get("level", 0))
     agent_name = alert.get("agent", {}).get("name", "unknown")
 
-    # ── Level filter (drop noise at Wazuh layer) ──────────────────────────
     if level < MIN_LEVEL:
-        logger.info("DROPPED level=%d rule=%s — below MIN_LEVEL=%d", level, rule_id, MIN_LEVEL)
+        logger.info("DROPPED level=%d rule=%s agent=%s - below MIN_LEVEL=%d", level, rule_id, agent_name, MIN_LEVEL)
         sys.exit(0)
 
-    # ── Use-case classification ────────────────────────────────────────────
     use_case = classify_use_case(alert)
-    if not use_case:
-        logger.info("DROPPED rule=%s level=%d — unclassified | desc=%s", rule_id, level, rule_desc)
-        sys.exit(0)
 
-    # ── Validate required fields ───────────────────────────────────────────
     missing = validate_required_fields(alert)
     if missing:
-        logger.warning(
-            "INCOMPLETE PAYLOAD rule=%s agent=%s use_case=%s | missing_fields=%s",
-            rule_id, agent_name, use_case, missing,
-        )
-        # Still forward — middleware will track completeness score; do not drop
+        logger.warning("INCOMPLETE PAYLOAD rule=%s agent=%s use_case=%s | missing=%s", rule_id, agent_name, use_case, missing)
 
-    # ── Enrich and forward ─────────────────────────────────────────────────
     alert["aegis_use_case"] = use_case
     if "receivedAt" not in alert:
         alert["receivedAt"] = datetime.now(timezone.utc).isoformat()
 
-    logger.info(
-        "ACCEPTED rule=%s level=%d agent=%s use_case=%s | desc=%s",
-        rule_id, level, agent_name, use_case, rule_desc,
-    )
+    redmine_note = " [L12+ -> Redmine Issue auto-open]" if level >= 12 else ""
+    logger.info("ACCEPTED rule=%s level=%d agent=%s use_case=%s%s | desc=%s", rule_id, level, agent_name, use_case, redmine_note, rule_desc)
 
     success = send_webhook(hook_url, alert, bearer_secret=api_key)
     if not success:
-        logger.error("FAILED to deliver to middleware — rule=%s", rule_id)
+        logger.error("FAILED to deliver - rule=%s agent=%s", rule_id, agent_name)
         sys.exit(1)
 
     sys.exit(0)

@@ -22,7 +22,8 @@ from datetime import datetime, timedelta, timezone
 # ── Configuration ──────────────────────────────────────────────────────────
 MIDDLEWARE_URL = "http://127.0.0.1:3000/api/bulk-ingest"  # uses SSH Reverse Tunnel
 ALERTS_FILE    = "/var/ossec/logs/alerts/alerts.json"
-DAYS_BACK      = 30        # how many days of history to backfill
+DAYS_BACK      = 30        # fallback window in days if INGEST_SINCE is not set
+INGEST_SINCE   = "2026-08-25T06:00:00+07:00"  # Only accept alerts occurring on or after this activation timestamp
 BATCH_SIZE     = 50        # send alerts in batches
 MIN_LEVEL      = 3         # include alerts from level 3+
 BEARER_SECRET  = ""        # leave blank unless webhookSecret is set in Aegis config
@@ -99,8 +100,17 @@ def main():
         print(f"[ERROR] Alerts file not found: {ALERTS_FILE}")
         sys.exit(1)
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=DAYS_BACK)
-    print(f"[Aegis Backfill] Reading alerts from last {DAYS_BACK} days...")
+    if INGEST_SINCE:
+        try:
+            cutoff = datetime.fromisoformat(INGEST_SINCE.replace("Z", "+00:00"))
+            print(f"[Aegis Backfill] Ingesting alerts from activation timestamp: {INGEST_SINCE} onwards...")
+        except Exception:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=DAYS_BACK)
+            print(f"[Aegis Backfill] Reading alerts from last {DAYS_BACK} days...")
+    else:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=DAYS_BACK)
+        print(f"[Aegis Backfill] Reading alerts from last {DAYS_BACK} days...")
+
     print(f"[Aegis Backfill] Source : {ALERTS_FILE}")
     print(f"[Aegis Backfill] Target : {MIDDLEWARE_URL}")
     print()

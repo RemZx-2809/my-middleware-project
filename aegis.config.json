@@ -1,15 +1,16 @@
 {
   "webhookSecret": "",
   "caPath": "",
-  "redmineUrl": "http://10.145.10.62:300",
+  "redmineUrl": "http://10.145.10.62:3000",
   "redmineApiKey": "5d807a15b24d2bae14ba7e62282fdee3cdcf31ce",
   "redmineProject": "tawaikiar-phoowang",
   "redmineTrackerId": "1",
   "redmineTriggerMode": "min_level",
-  "redmineMinLevel": "7",
+  "redmineMinLevel": "12",
   "redmineCustomRules": "",
   "redmineDedupHours": "24",
   "redmineAutoTicket": true,
+  "ingestSince": "auto",
   "sshAutoTunnel": true,
   "sshHost": "10.145.10.57",
   "sshUser": "tawaikiar_p"

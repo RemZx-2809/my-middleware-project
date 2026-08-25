@@ -160,13 +160,7 @@ const DiscoverController = (() => {
         }
       }
 
-      // If empty data from API, create realistic sample Wazuh log entries matching the reference screenshots
-      if (flat.length === 0) {
-        _allLogs = _generateMockLogs();
-      } else {
-        _allLogs = flat;
-      }
-
+      _allLogs = flat || [];
       renderAll();
 
       if (showFeedback && window.Toast) {
@@ -178,16 +172,16 @@ const DiscoverController = (() => {
         });
       }
     } catch (e) {
-      console.warn('[Discover] Using mock logs fallback:', e.message);
-      _allLogs = _generateMockLogs();
+      console.warn('[Discover] Error fetching logs:', e.message);
+      _allLogs = [];
       renderAll();
 
       if (showFeedback && window.Toast) {
         window.Toast.show({
-          type: 'info',
-          title: 'Refreshed',
-          body: `Loaded ${_allLogs.length.toLocaleString()} events`,
-          duration: 2000
+          type: 'error',
+          title: 'Fetch Error',
+          body: `Could not load logs: ${e.message}`,
+          duration: 2500
         });
       }
     } finally {
@@ -196,50 +190,6 @@ const DiscoverController = (() => {
         if (refreshBtn) refreshBtn.disabled = false;
       }, 350);
     }
-  }
-
-  function _generateMockLogs() {
-    const logs = [];
-    const baseTime = Date.now();
-    const rules = [
-      { id: '81606', level: 4, desc: 'Fortigate: Login failed.' },
-      { id: '5501', level: 7, desc: 'PAM: User login failed.' },
-      { id: '5710', level: 11, desc: 'sshd: Attempt to login using invalid user.' },
-      { id: '5715', level: 3, desc: 'sshd: Authentication success.' },
-      { id: '87105', level: 12, desc: 'Wazuh: Multiple authentication failures detected.' },
-    ];
-    const agents = ['wazuh-server', 'db-primary-01', 'web-gateway-02', 'k8s-node-03'];
-
-    // Generate ~450 log records across past 24 hours
-    for (let i = 0; i < 450; i++) {
-      const r = rules[i % rules.length];
-      const ag = agents[i % 2 === 0 ? 0 : (i % agents.length)];
-      const tsOffset = (i * 3.2 * 60 * 1000) + (Math.random() * 30000);
-      const logDate = new Date(baseTime - tsOffset);
-
-      logs.push({
-        id: `log-${i + 1}`,
-        timestamp: logDate.toISOString(),
-        receivedAt: logDate.toISOString(),
-        agent: { name: ag, id: '000', ip: '10.145.10.58' },
-        manager: { name: 'wazuh-server' },
-        rule: {
-          id: r.id,
-          level: r.level,
-          description: r.desc,
-          groups: ['fortigate', 'authentication_failed', 'syslog'],
-        },
-        data: {
-          srcip: '192.168.1.105',
-          dstip: '10.145.10.1',
-          user: 'admin',
-          action: 'login_denied',
-        },
-        full_log: `Aug 17 10:30:49 wazuh-server fortigate: ${r.desc} user=admin srcip=192.168.1.105`,
-      });
-    }
-
-    return logs;
   }
 
   function getFilteredLogs() {
@@ -450,7 +400,7 @@ const DiscoverController = (() => {
     }
 
     container.innerHTML = `
-      <svg class="histogram-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+      <svg class="histogram-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" onmouseleave="DiscoverController.hideBarTooltip()">
         <g>${gridHtml}</g>
         <g>${yTicksHtml}</g>
         <g>${barsHtml}</g>
@@ -517,13 +467,13 @@ const DiscoverController = (() => {
     const d = new Date(ts);
     if (isNaN(d.getTime())) return ts;
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const m = months[d.getUTCMonth()] || months[d.getMonth()];
-    const day = d.getUTCDate().toString().padStart(2, '0');
-    const y = d.getUTCFullYear();
-    const hh = d.getUTCHours().toString().padStart(2, '0');
-    const mm = d.getUTCMinutes().toString().padStart(2, '0');
-    const ss = d.getUTCSeconds().toString().padStart(2, '0');
-    const ms = d.getUTCMilliseconds().toString().padStart(1, '0');
+    const m = months[d.getMonth()];
+    const day = d.getDate().toString().padStart(2, '0');
+    const y = d.getFullYear();
+    const hh = d.getHours().toString().padStart(2, '0');
+    const mm = d.getMinutes().toString().padStart(2, '0');
+    const ss = d.getSeconds().toString().padStart(2, '0');
+    const ms = d.getMilliseconds().toString().padStart(3, '0');
     return `${m} ${day}, ${y} @ ${hh}:${mm}:${ss}.${ms}`;
   }
 
@@ -2381,18 +2331,73 @@ const DiscoverController = (() => {
   }
 
   /* ── Document Side Panel ─────────────────────────────────── */
+  let _dspWidth = parseInt(localStorage.getItem('aegis_dsp_width') || '560', 10);
+  if (isNaN(_dspWidth) || _dspWidth < 360) _dspWidth = 560;
+
+  function _initDocSidePanelResizer(panel) {
+    const handle = panel.querySelector('.dsp-resize-handle');
+    if (!handle || handle._hasResizer) return;
+    handle._hasResizer = true;
+
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    const onMouseDown = (e) => {
+      isResizing = true;
+      startX = e.clientX;
+      startWidth = panel.getBoundingClientRect().width;
+      panel.classList.add('resizing');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const onMouseMove = (e) => {
+      if (!isResizing) return;
+      // Dragging left increases width, dragging right decreases width
+      const deltaX = startX - e.clientX;
+      let newWidth = startWidth + deltaX;
+      const minW = 360;
+      const maxW = Math.min(window.innerWidth - 40, 1600);
+      newWidth = Math.max(minW, Math.min(maxW, newWidth));
+      panel.style.width = newWidth + 'px';
+      _dspWidth = newWidth;
+    };
+
+    const onMouseUp = () => {
+      if (!isResizing) return;
+      isResizing = false;
+      panel.classList.remove('resizing');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      try {
+        localStorage.setItem('aegis_dsp_width', String(_dspWidth));
+      } catch (_) {}
+    };
+
+    handle.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }
+
   function _openDocSidePanel(log, globalIdx) {
     _ensureDocSidePanel();
     const panel = document.getElementById('doc-side-panel');
     if (!panel) return;
 
+    // Apply persisted or default width
+    panel.style.width = _dspWidth + 'px';
+
     const activeTab = _activeDrawerTab[globalIdx] || 'table';
 
-    // Build inner content
+    // Build inner content with resize handle and close button
     panel.innerHTML = `
+      <div class="dsp-resize-handle" id="dsp-resize-handle" title="Drag left/right to resize"></div>
       <div class="dsp-header">
         <span class="dsp-title">Document Details</span>
-        <button class="dsp-close-btn" title="Close" onclick="DiscoverController.closeDocSidePanel()">
+        <button class="dsp-close-btn" id="dsp-close-btn" title="Close" onclick="DiscoverController.closeDocSidePanel()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
@@ -2408,6 +2413,20 @@ const DiscoverController = (() => {
     `;
 
     panel.classList.add('open');
+
+    // Attach click handler directly to ensure button always works
+    const closeBtn = panel.querySelector('.dsp-close-btn');
+    if (closeBtn) {
+      closeBtn.onclick = (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        closeDocSidePanel();
+      };
+    }
+
+    _initDocSidePanelResizer(panel);
 
     // Shrink table area when panel is open
     const tableCard = document.querySelector('.discover-table-card');
@@ -2432,6 +2451,7 @@ const DiscoverController = (() => {
     const panel = document.createElement('div');
     panel.id = 'doc-side-panel';
     panel.className = 'doc-side-panel';
+    panel.style.width = _dspWidth + 'px';
     // Attach inside #view-discover
     const discoverView = document.getElementById('view-discover');
     if (discoverView) {
@@ -2439,6 +2459,13 @@ const DiscoverController = (() => {
     } else {
       document.body.appendChild(panel);
     }
+
+    // ESC key closes drawer
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && panel.classList.contains('open')) {
+        closeDocSidePanel();
+      }
+    });
   }
 
   function viewSurroundingDocs(globalIdx) {
@@ -2535,12 +2562,14 @@ const DiscoverController = (() => {
     sortByColumn,
     toggleFullscreen,
     showBarTooltip,
+    hideBarTooltip,
     toggleDatesPopover,
     closeDatesModal,
     toggleTimeRangePopover,
     closeTimeRangeModal,
     viewSurroundingDocs,
     viewSingleDoc,
+    closeDocSidePanel,
   };
 })();
 

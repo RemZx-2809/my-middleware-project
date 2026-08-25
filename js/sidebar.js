@@ -14,7 +14,7 @@ const SidebarController = (() => {
     { id: 'nav-dashboard', label: 'Security Overview', breadcrumb: 'Security Overview' },
     { id: 'nav-discover',  label: 'Discover',          breadcrumb: 'Discover / Logs' },
     { id: 'nav-storage',   label: 'Database',          breadcrumb: 'Database Storage' },
-    { id: 'nav-history',   label: 'History',           breadcrumb: 'File Edit History' },
+    { id: 'nav-history',   label: 'History',           breadcrumb: 'Resolved Vulnerabilities History' },
   ];
 
   function init() {
