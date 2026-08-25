@@ -459,24 +459,48 @@ html, body {
 
 #search-input {
   width: 100%;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid var(--border-subtle);
+  background: #090d16 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius-sm);
   padding: 7px 36px 7px 32px;
   font-family: var(--font-ui);
   font-size: var(--fs-sm);
-  color: var(--text-hi);
+  color: #f8fafc !important;
   outline: none;
   transition: border-color var(--t-fast), background var(--t-fast), box-shadow var(--t-fast);
 }
-#search-input::placeholder { color: var(--text-lo); }
-#search-input:focus {
-  border-color: var(--border-active);
-  background: rgba(34, 211, 238, 0.04);
-  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.08);
+
+#search-input::placeholder {
+  color: var(--text-lo);
 }
+
+#search-input:focus {
+  border-color: #34d399;
+  background: #06090e !important;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.15);
+}
+
+#search-input:-webkit-autofill,
+#search-input:-webkit-autofill:hover,
+#search-input:-webkit-autofill:focus,
+#search-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #090d16 inset !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  caret-color: #f8fafc !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+#search-input::-webkit-search-decoration,
+#search-input::-webkit-search-cancel-button,
+#search-input::-webkit-search-results-button,
+#search-input::-webkit-search-results-decoration {
+  display: none;
+}
+
 #search-input:focus + .search-shortcut,
-#search-input:focus ~ .search-shortcut { opacity: 0; }
+#search-input:focus ~ .search-shortcut {
+  opacity: 0;
+}
 
 /* ── Topbar Right ────────────────────────────────────────── */
 .topbar-right {
@@ -1252,4 +1276,17 @@ html, body {
   transition: opacity var(--t-fast);
 }
 .tr-apply-btn:hover { opacity: 0.85; }
+
+/* ── Global Dark Theme Form & Autofill Reset ──────────────── */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+select:-webkit-autofill,
+textarea:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px #0b0f19 inset !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  caret-color: #f8fafc !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
 

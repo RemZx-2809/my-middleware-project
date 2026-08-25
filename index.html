@@ -132,12 +132,26 @@
 
       <!-- Search -->
       <div class="topbar-search" role="search">
+        <!-- Hidden decoy inputs to absorb browser password managers -->
+        <div style="opacity:0; position:absolute; top:0; left:0; height:0; width:0; z-index:-1; pointer-events:none; overflow:hidden;" aria-hidden="true">
+          <input type="text" name="decoy_user" tabindex="-1" autocomplete="username" />
+          <input type="password" name="decoy_pass" tabindex="-1" autocomplete="current-password" />
+        </div>
         <span class="search-icon" aria-hidden="true"><i data-lucide="search"></i></span>
         <input
-          type="search"
+          type="text"
           id="search-input"
+          name="search_query_soc"
           placeholder="Search incidents, hosts, IOCs…"
-          autocomplete="off"
+          autocomplete="new-password"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
+          data-lpignore="true"
+          data-form-type="other"
+          readonly
+          onfocus="this.removeAttribute('readonly');"
+          value=""
           aria-label="Search incidents, hosts, and IOCs"
         />
         <span class="search-shortcut" aria-hidden="true">/</span>
@@ -1078,119 +1092,69 @@
         </div>
 
         <!-- ═══════════════════════════════════════════
-             WAZUH INTEGRATION SECTION
+             WAZUH WEBHOOK & REVERSE SSH TUNNEL SECTION
         ═══════════════════════════════════════════ -->
-        <section id="settings-integrations" aria-label="Wazuh integration settings">
+        <section id="settings-integrations" aria-label="Wazuh webhook and SSH tunnel settings">
 
           <!-- Section Heading -->
           <div class="settings-section-header">
-            <div class="settings-section-icon">
-              <i data-lucide="plug"></i>
+            <div class="settings-section-icon" style="background: rgba(52,211,153,0.1); border-color: rgba(52,211,153,0.25); color: #34d399;">
+              <i data-lucide="radio-receiver"></i>
             </div>
             <div class="settings-section-text">
               <div class="settings-section-title-row">
-                <h2 class="settings-section-title">Wazuh SIEM / XDR</h2>
-                <div id="int-wazuh-badge" class="int-status-badge int-status-badge--disconnected">
+                <h2 class="settings-section-title">Wazuh Webhook Ingest &amp; SSH Reverse Tunnel</h2>
+                <div id="int-receiver-badge" class="int-status-badge int-status-badge--connected">
                   <span class="int-badge-dot"></span>
-                  <span class="int-badge-text">NOT CONNECTED</span>
+                  <span class="int-badge-text">RECEIVER ACTIVE (Port 3000)</span>
                 </div>
               </div>
-              <p class="settings-section-sub">Security Information & Event Management integration settings</p>
+              <p class="settings-section-sub">Pure Receiver Architecture — Wazuh Manager pushes security alert payloads directly to this middleware via Webhook &amp; Reverse SSH Tunnel.</p>
             </div>
           </div>
 
           <!-- 2-Column Grid -->
           <div class="int-grid">
 
-            <!-- LEFT CARD: Connection Details -->
+            <!-- LEFT CARD: Webhook Receiver Endpoint -->
             <div class="int-card">
               <div class="int-card-header">
                 <div class="int-card-title-group">
-                  <h3 class="int-card-title">Connection Details</h3>
-                  <p class="int-card-subtitle">Enter your Wazuh Manager endpoint information</p>
+                  <h3 class="int-card-title">Webhook Ingestion Endpoint</h3>
+                  <p class="int-card-subtitle">Endpoint for Wazuh integration scripts &amp; external forwarders</p>
                 </div>
               </div>
 
               <div class="int-card-body">
-                <!-- Manager API URL -->
+                <!-- Webhook URL Display -->
                 <div class="int-field">
-                  <label class="int-label" for="wazuh-api-url">
-                    <span>Manager API URL <span class="int-label-required">*</span></span>
-                    <i data-lucide="info" class="int-info-icon" title="Wazuh Manager API hostname or IP address"></i>
-                  </label>
-                  <div class="int-input-group">
-                    <select id="wazuh-api-proto" class="int-select-proto" aria-label="Protocol">
-                      <option value="https://">https://</option>
-                      <option value="http://">http://</option>
-                    </select>
-                    <div class="int-input-wrap int-input-wrap--proto">
-                      <input
-                        type="text"
-                        id="wazuh-api-url"
-                        class="int-input"
-                        placeholder="wazuh-manager or IP address"
-                        value="wazuh-manager"
-                        autocomplete="off"
-                        spellcheck="false"
-                        aria-label="Wazuh Manager API URL"
-                        aria-required="true"
-                      />
-                    </div>
-                  </div>
-                  <span class="int-field-hint">Example: 10.145.10.58 or wazuh-manager</span>
-                </div>
-
-                <!-- Port -->
-                <div class="int-field">
-                  <label class="int-label" for="wazuh-api-port">
-                    <span>Port <span class="int-label-required">*</span></span>
-                    <i data-lucide="info" class="int-info-icon" title="Wazuh Manager API Port"></i>
+                  <label class="int-label" for="wazuh-webhook-url">
+                    <span>Webhook Receiver URL</span>
+                    <i data-lucide="info" class="int-info-icon" title="Send POST requests with alert JSON payloads to this endpoint"></i>
                   </label>
                   <div class="int-input-wrap">
+                    <span class="int-input-icon"><i data-lucide="link"></i></span>
                     <input
-                      type="number"
-                      id="wazuh-api-port"
-                      class="int-input int-input--plain"
-                      value="55000"
-                      min="1"
-                      max="65535"
-                      aria-label="Wazuh API port"
+                      type="text"
+                      id="wazuh-webhook-url"
+                      class="int-input int-input--mono"
+                      value="http://127.0.0.1:3000/api/wazuh-webhook"
+                      readonly
+                      style="color:#34d399; font-weight:600; cursor:pointer;"
+                      title="Click to copy Webhook URL"
                     />
+                    <button class="int-input-reveal" id="btn-copy-webhook-url" aria-label="Copy webhook URL" type="button" title="Copy to clipboard">
+                      <i data-lucide="copy"></i>
+                    </button>
                   </div>
-                  <span class="int-field-hint">Default port is 55000</span>
-                </div>
-
-                <!-- Security Sub-Card -->
-                <div class="int-subcard">
-                  <div class="int-subcard-header">
-                    <span class="int-subcard-title">Security</span>
-                  </div>
-                  <div class="int-checkbox-wrap-custom">
-                    <label class="int-checkbox-label-custom" for="wazuh-ssl-verify">
-                      <input
-                        type="checkbox"
-                        id="wazuh-ssl-verify"
-                        class="int-checkbox"
-                        checked
-                        aria-label="Verify SSL certificate"
-                      />
-                      <span class="int-checkbox-box" aria-hidden="true"></span>
-                      <span class="int-checkbox-text-group">
-                        <span class="int-checkbox-title-row">
-                          Verify SSL Certificate
-                          <span class="int-badge-recommended">Recommended</span>
-                        </span>
-                        <span class="int-field-hint">Enable for production environments with valid SSL certificates</span>
-                      </span>
-                    </label>
-                  </div>
+                  <span class="int-field-hint">Used by <code style="font-family:var(--font-mono);font-size:11px;color:#38bdf8">custom-aegis.py</code> on the Wazuh Manager to push alerts in real time.</span>
                 </div>
 
                 <!-- Webhook Secret -->
                 <div class="int-field">
                   <label class="int-label" for="wazuh-webhook-secret">
-                    <span>Webhook Secret</span>
-                    <i data-lucide="info" class="int-info-icon" title="Shared secret for authenticating Wazuh push events. Set the same value as AEGIS_WEBHOOK_SECRET on the server and in the Wazuh custom-aegis integration script."></i>
+                    <span>Webhook Shared Secret (Optional)</span>
+                    <i data-lucide="info" class="int-info-icon" title="Optional Bearer token for authenticating push events. Leave blank for dev mode."></i>
                   </label>
                   <div class="int-input-wrap">
                     <span class="int-input-icon"><i data-lucide="key-round"></i></span>
@@ -1198,129 +1162,106 @@
                       type="password"
                       id="wazuh-webhook-secret"
                       class="int-input int-input--mono"
-                      placeholder="e.g. a7f3c9e2b1d8f5a4…"
+                      placeholder="Leave blank for open dev mode, or enter secret"
                       autocomplete="off"
                       spellcheck="false"
                       aria-label="Webhook shared secret"
                     />
+                    <button class="int-input-reveal" id="wazuh-secret-reveal-btn" aria-label="Toggle secret visibility" type="button">
+                      <i data-lucide="eye"></i>
+                    </button>
                   </div>
-                  <span class="int-field-hint">Used in <code style="font-family:var(--font-mono);font-size:10px;color:var(--accent)">Authorization: Bearer &lt;secret&gt;</code> header — must match the server and Wazuh ossec.conf</span>
+                  <span class="int-field-hint">If set, requests must supply matching <code style="font-family:var(--font-mono);font-size:10px;color:var(--accent)">Authorization: Bearer &lt;secret&gt;</code></span>
+                </div>
+
+                <!-- Bulk Ingest Info Callout -->
+                <div class="int-callout" style="background:rgba(56,189,248,0.06); border-color:rgba(56,189,248,0.2);">
+                  <div class="int-callout-icon" style="color:#38bdf8;">
+                    <i data-lucide="layers"></i>
+                  </div>
+                  <div class="int-callout-content">
+                    <p style="color:#e2e8f0; font-size:12px;"><strong>Bulk Ingestion API:</strong> <code style="color:#38bdf8;">POST /api/bulk-ingest</code></p>
+                    <span style="color:#94a3b8; font-size:11px;">Upload historical JSON array or lines from <code style="color:#cbd5e1;">alerts.json</code> for backfill analysis.</span>
+                  </div>
                 </div>
 
               </div><!-- /int-card-body -->
             </div><!-- /int-card left -->
 
 
-            <!-- RIGHT CARD: Authentication -->
+            <!-- RIGHT CARD: Reverse SSH Tunnel -->
             <div class="int-card">
               <div class="int-card-header">
                 <div class="int-card-title-group">
-                  <h3 class="int-card-title">Authentication</h3>
-                  <p class="int-card-subtitle">Choose your authentication method</p>
+                  <h3 class="int-card-title">SSH Reverse Tunnel Configuration</h3>
+                  <p class="int-card-subtitle">Secure port forwarding from remote Wazuh Manager to local middleware</p>
                 </div>
               </div>
 
               <div class="int-card-body">
-                <!-- Segmented Tab Control -->
-                <div class="int-auth-toggle" role="group" aria-label="Authentication method">
-                  <button
-                    id="auth-toggle-userpass"
-                    class="int-auth-tab active"
-                    data-auth="userpass"
-                    aria-pressed="true"
-                    type="button"
-                  >
-                    <i data-lucide="user"></i>
-                    Username / Password
-                  </button>
-                  <button
-                    id="auth-toggle-token"
-                    class="int-auth-tab"
-                    data-auth="token"
-                    aria-pressed="false"
-                    type="button"
-                  >
-                    <i data-lucide="key"></i>
-                    API Token (JWT)
-                  </button>
-                </div>
-
-                <!-- Panel A: Userpass -->
-                <div id="auth-fields-userpass" class="int-auth-panel" data-panel="userpass">
-                  <div class="int-field">
-                    <label class="int-label" for="wazuh-username">
-                      <span>Username <span class="int-label-required">*</span></span>
-                      <i data-lucide="info" class="int-info-icon" title="Wazuh API user name"></i>
-                    </label>
-                    <div class="int-input-wrap">
-                      <span class="int-input-icon"><i data-lucide="user"></i></span>
-                      <input
-                        type="text"
-                        id="wazuh-username"
-                        class="int-input"
-                        placeholder="e.g. wazuh-wui or admin"
-                        autocomplete="username"
-                        aria-label="Wazuh API username"
-                      />
-                    </div>
-                    <span id="wazuh-username-warning" class="int-field-hint" style="color:#f4576a;display:none;"></span>
-                  </div>
-
-                  <div class="int-field">
-                    <label class="int-label" for="wazuh-password">
-                      <span>Password <span class="int-label-required">*</span></span>
-                      <i data-lucide="info" class="int-info-icon" title="Wazuh API user password"></i>
-                    </label>
-                    <div class="int-input-wrap">
-                      <span class="int-input-icon"><i data-lucide="lock"></i></span>
-                      <input
-                        type="password"
-                        id="wazuh-password"
-                        class="int-input"
-                        placeholder="Enter API password"
-                        autocomplete="current-password"
-                        aria-label="Wazuh API password"
-                      />
-                      <button class="int-input-reveal" id="password-reveal-btn" aria-label="Toggle password visibility" type="button">
-                        <i data-lucide="eye"></i>
-                      </button>
-                    </div>
+                <!-- SSH Host -->
+                <div class="int-field">
+                  <label class="int-label" for="ssh-host">
+                    <span>Wazuh Server Host / IP <span class="int-label-required">*</span></span>
+                    <i data-lucide="info" class="int-info-icon" title="IP address or domain of the Wazuh Manager"></i>
+                  </label>
+                  <div class="int-input-wrap">
+                    <span class="int-input-icon"><i data-lucide="server"></i></span>
+                    <input
+                      type="text"
+                      id="ssh-host"
+                      class="int-input"
+                      placeholder="e.g. 10.145.10.57"
+                      value="10.145.10.57"
+                      autocomplete="off"
+                    />
                   </div>
                 </div>
 
-                <!-- Panel B: Token -->
-                <div id="auth-fields-token" class="int-auth-panel" data-panel="token" style="display:none;">
-                  <div class="int-field">
-                    <label class="int-label" for="wazuh-jwt-token">
-                      <span>JWT Token <span class="int-label-required">*</span></span>
-                      <i data-lucide="info" class="int-info-icon" title="Bearer token for Wazuh API"></i>
-                    </label>
-                    <div class="int-input-wrap">
-                      <span class="int-input-icon"><i data-lucide="shield-check"></i></span>
-                      <input
-                        type="password"
-                        id="wazuh-jwt-token"
-                        class="int-input int-input--mono"
-                        placeholder="eyJhbGciOiJFUzUxMiIsInR5cCI6IkpXVCJ9…"
-                        autocomplete="off"
-                        spellcheck="false"
-                        aria-label="Wazuh API JWT token"
-                      />
-                      <button class="int-input-reveal" id="token-reveal-btn" aria-label="Toggle token visibility" type="button">
-                        <i data-lucide="eye"></i>
-                      </button>
-                    </div>
+                <!-- SSH User -->
+                <div class="int-field">
+                  <label class="int-label" for="ssh-user">
+                    <span>SSH Username <span class="int-label-required">*</span></span>
+                    <i data-lucide="info" class="int-info-icon" title="User account on the Wazuh server with SSH access"></i>
+                  </label>
+                  <div class="int-input-wrap">
+                    <span class="int-input-icon"><i data-lucide="user"></i></span>
+                    <input
+                      type="text"
+                      id="ssh-user"
+                      class="int-input"
+                      placeholder="e.g. tawaikiar_p"
+                      value="tawaikiar_p"
+                      autocomplete="off"
+                    />
                   </div>
                 </div>
 
-                <!-- Callout Box -->
-                <div class="int-callout">
-                  <div class="int-callout-icon">
-                    <i data-lucide="info"></i>
+                <!-- SSH Auto Tunnel Checkbox -->
+                <div class="int-field">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                    <label class="int-label" style="margin-bottom:0;" for="ssh-auto-tunnel">
+                      <span>Auto-Connect Tunnel on Startup</span>
+                    </label>
+                    <input type="checkbox" id="ssh-auto-tunnel" checked style="width: 18px; height: 18px; cursor: pointer; accent-color: #34d399;" />
                   </div>
-                  <div class="int-callout-content">
-                    <p>For API Token authentication, create a JWT token in your Wazuh Manager</p>
-                    <a href="#" class="int-callout-link" onclick="event.preventDefault();">Learn how to generate API tokens →</a>
+                  <span class="int-field-hint">Automatically creates reverse tunnel (<code style="color:#34d399;">-R 3000:localhost:3000</code>) using RSA key.</span>
+                </div>
+
+                <!-- Tunnel Control Card -->
+                <div class="int-subcard" style="padding:12px 14px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                      <div style="font-size:12px; font-weight:600; color:#e2e8f0; display:flex; align-items:center; gap:6px;">
+                        <i data-lucide="cable" style="width:14px; height:14px; color:#38bdf8;"></i>
+                        <span>Tunnel Status</span>
+                      </div>
+                      <div id="settings-tunnel-status-text" style="font-size:11px; color:#94a3b8; margin-top:2px;">Checking connection…</div>
+                    </div>
+                    <button id="btn-toggle-tunnel" class="int-btn int-btn--primary" style="padding:5px 12px; font-size:12px;" type="button">
+                      <i data-lucide="refresh-cw"></i>
+                      <span>Toggle Tunnel</span>
+                    </button>
                   </div>
                 </div>
 
@@ -1329,50 +1270,15 @@
 
           </div><!-- /int-grid -->
 
-          <!-- FULL-WIDTH CARD: Test Connection -->
-          <div class="int-card int-card--test">
-            <div class="int-test-card-body">
-              <div class="int-test-title-group">
-                <h3 class="int-card-title">Test Connection</h3>
-                <p class="int-card-subtitle">Verify your connection settings and credentials</p>
-              </div>
-
-              <div class="int-test-meta">
-                <i data-lucide="clock" class="int-meta-icon"></i>
-                <span id="int-last-tested" class="int-meta-text">Last tested: Never</span>
-              </div>
-
-              <div class="int-test-action">
-                <button id="wazuh-test-btn" class="int-btn int-btn--primary" type="button" aria-label="Test Wazuh connection">
-                  <i data-lucide="wifi"></i>
-                  Test Connection
-                </button>
-              </div>
-            </div>
-
-            <!-- Test Result Banner (hidden by default) -->
-            <div id="wazuh-test-result" class="int-test-result" role="status" aria-live="polite" style="display:none;">
-              <div class="int-result-icon"><i data-lucide="loader-2"></i></div>
-              <div class="int-result-body">
-                <span class="int-result-title">Testing…</span>
-                <span class="int-result-detail"></span>
-              </div>
-            </div>
-          </div>
-
           <!-- WAZUH BOTTOM ACTION BAR -->
           <div class="int-bottom-bar">
             <div class="int-bottom-left">
-              <button id="wazuh-clear-btn" class="int-btn int-btn--outline-danger" type="button" aria-label="Clear saved Wazuh settings">
-                <i data-lucide="trash-2"></i>
-                Clear
-              </button>
+              <span style="font-size: 11px; color: var(--text-lo); font-family: 'JetBrains Mono', monospace;">PURE RECEIVER DAEMON v2.0</span>
             </div>
             <div class="int-bottom-right">
-              <button id="wazuh-cancel-btn" class="int-btn int-btn--neutral" type="button" aria-label="Cancel editing settings">Cancel</button>
-              <button id="wazuh-save-btn" class="int-btn int-btn--primary" type="button" aria-label="Save Wazuh integration settings">
+              <button id="wazuh-save-btn" class="int-btn int-btn--primary" type="button" aria-label="Save settings">
                 <i data-lucide="save"></i>
-                Save Settings
+                Save Ingestion &amp; Tunnel Settings
               </button>
             </div>
           </div>

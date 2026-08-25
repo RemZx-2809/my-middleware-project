@@ -850,14 +850,31 @@ const server = http.createServer(async (req, res) => {
     let body;
     try { body = JSON.parse(await readBody(req)); } catch { return json(res, 400, { error: 'Invalid JSON' }); }
 
-    const beforeSnapshot = JSON.stringify({ webhookSecretSet: !!_config.webhookSecret, ingestSince: _config.ingestSince });
+    const beforeSnapshot = JSON.stringify(_config);
     if (typeof body.webhookSecret === 'string') _config.webhookSecret = body.webhookSecret;
+    if (typeof body.sshHost === 'string') _config.sshHost = body.sshHost.trim();
+    if (typeof body.sshUser === 'string') _config.sshUser = body.sshUser.trim();
+    if (typeof body.sshAutoTunnel === 'boolean') _config.sshAutoTunnel = body.sshAutoTunnel;
     if (typeof body.ingestSince === 'string') _config.ingestSince = body.ingestSince.trim();
-    try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(_config, null, 2), 'utf8'); } catch (e) { return json(res, 500, { error: 'Could not save config', detail: e.message }); }
-    const afterSnapshot = JSON.stringify({ webhookSecretSet: !!_config.webhookSecret, ingestSince: _config.ingestSince });
+
+    try {
+      fs.writeFileSync(CONFIG_FILE, JSON.stringify(_config, null, 2), 'utf8');
+    } catch (e) {
+      return json(res, 500, { error: 'Could not save config', detail: e.message });
+    }
+
+    const afterSnapshot = JSON.stringify(_config);
     logAudit({ user: req.headers['x-aegis-user'] || 'browser', action: 'config_update', filename: 'aegis.config.json', before: beforeSnapshot, after: afterSnapshot }).catch(() => {});
-    console.log(`[AEGIS] Config updated (ingestSince: ${_config.ingestSince})`);
-    return json(res, 200, { ok: true, ingestSince: _config.ingestSince, effectiveIngestSince: getEffectiveIngestCutoff() });
+    console.log(`[AEGIS] Config updated (sshHost: ${_config.sshHost}, sshUser: ${_config.sshUser})`);
+    return json(res, 200, {
+      ok: true,
+      webhookSecret: _config.webhookSecret,
+      sshHost: _config.sshHost,
+      sshUser: _config.sshUser,
+      sshAutoTunnel: _config.sshAutoTunnel,
+      ingestSince: _config.ingestSince,
+      effectiveIngestSince: getEffectiveIngestCutoff()
+    });
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -865,8 +882,12 @@ const server = http.createServer(async (req, res) => {
   ══════════════════════════════════════════════════════════ */
   if (pathname === '/api/config' && method === 'GET') {
     return json(res, 200, {
+      webhookSecret: _config.webhookSecret || '',
       webhookSecretSet: !!_config.webhookSecret,
       devMode: !_config.webhookSecret,
+      sshHost: _config.sshHost || '10.145.10.57',
+      sshUser: _config.sshUser || 'tawaikiar_p',
+      sshAutoTunnel: _config.sshAutoTunnel !== false,
       ingestSince: _config.ingestSince || 'auto',
       effectiveIngestSince: getEffectiveIngestCutoff(),
       serviceBootTime: _serviceBootTime,

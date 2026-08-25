@@ -382,8 +382,16 @@ const DiscoverController = (() => {
     }
 
     const duration = Math.max(60000, rangeEnd - rangeStart);
-    const numBuckets = 48; // 30-minute intervals over 24h
+    const numBuckets = 48;
     const bucketMs = duration / numBuckets;
+
+    // Dynamic interval description
+    let intervalLabel = '30 minutes';
+    if (bucketMs < 1000) intervalLabel = 'second';
+    else if (bucketMs < 60000) intervalLabel = `${Math.round(bucketMs / 1000)} seconds`;
+    else if (bucketMs < 3600000) intervalLabel = `${Math.round(bucketMs / 60000)} minutes`;
+    else if (bucketMs < 86400000) intervalLabel = `${Math.round(bucketMs / 3600000)} hours`;
+    else intervalLabel = `${Math.round(bucketMs / 86400000)} days`;
 
     const buckets = Array.from({ length: numBuckets }, (_, i) => ({
       index: i,
@@ -403,11 +411,11 @@ const DiscoverController = (() => {
     });
 
     const width = container.clientWidth || 900;
-    const height = 180;
-    const padL = 40;
-    const padR = 20;
-    const padT = 15;
-    const padB = 35;
+    const height = 195;
+    const padL = 46;
+    const padR = 30;
+    const padT = 14;
+    const padB = 46;
 
     const chartW = width - padL - padR;
     const chartH = height - padT - padB;
@@ -440,11 +448,12 @@ const DiscoverController = (() => {
               x="${x}" y="${y}" width="${barW}" height="${Math.max(1, h)}"
               data-count="${b.count}" data-time="${startDateStr}"
               onmouseenter="DiscoverController.showBarTooltip(event, '${startDateStr}', ${b.count})"
-              onmouseleave="DiscoverController.hideBarTooltip()" />
+              onmouseleave="DiscoverController.hideBarTooltip()"
+              onclick="DiscoverController.zoomToBucket(${b.start}, ${b.end})" />
       `;
     });
 
-    // Render X Ticks
+    // Render X Ticks with boundary-safe anchors
     let xTicksHtml = '';
     const xStepCount = 6;
     for (let i = 0; i < xStepCount; i++) {
@@ -452,17 +461,45 @@ const DiscoverController = (() => {
       const t = new Date(buckets[bIdx].start);
       const timeStr = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const x = padL + bIdx * (chartW / numBuckets);
-      xTicksHtml += `<text class="histogram-axis-text" x="${x}" y="${padT + chartH + 18}" text-anchor="middle">${timeStr}</text>`;
+      const anchor = (i === 0) ? 'start' : (i === xStepCount - 1 ? 'end' : 'middle');
+      xTicksHtml += `<text class="histogram-axis-text" x="${x}" y="${padT + chartH + 17}" text-anchor="${anchor}">${timeStr}</text>`;
     }
 
+    const isZoomed = duration < 24 * 3600 * 1000 - 60000;
+
     container.innerHTML = `
+      <div class="discover-histogram-header">
+        <div class="discover-histogram-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          <span>Event Timeline Histogram</span>
+          ${isZoomed ? '<span class="discover-histogram-zoom-badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg> Zoomed View</span>' : ''}
+        </div>
+        <div class="discover-histogram-controls">
+          <button class="hist-zoom-btn" title="Zoom in to center (2x)" onclick="DiscoverController.zoomIn()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+            Zoom In
+          </button>
+          <button class="hist-zoom-btn" title="Zoom out (2x)" onclick="DiscoverController.zoomOut()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+            Zoom Out
+          </button>
+          <button class="hist-zoom-btn" title="Zoom to fit all events" onclick="DiscoverController.zoomFitHits()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+            Fit Hits
+          </button>
+          <button class="hist-zoom-btn" title="Reset Zoom to full time range" onclick="DiscoverController.resetZoom()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+            Reset
+          </button>
+        </div>
+      </div>
       <svg class="histogram-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" onmouseleave="DiscoverController.hideBarTooltip()">
         <g>${gridHtml}</g>
         <g>${yTicksHtml}</g>
         <g>${barsHtml}</g>
         <g>${xTicksHtml}</g>
         <text class="histogram-axis-text" x="${12}" y="${padT + chartH / 2}" transform="rotate(-90 12 ${padT + chartH / 2})" text-anchor="middle">Count</text>
-        <text class="histogram-axis-text" x="${padL + chartW / 2}" y="${padT + chartH + 32}" text-anchor="middle">timestamp per 30 minutes</text>
+        <text class="histogram-axis-text" x="${padL + chartW / 2}" y="${padT + chartH + 32}" text-anchor="middle">timestamp per ${intervalLabel}</text>
       </svg>
     `;
   }
@@ -2567,25 +2604,159 @@ const DiscoverController = (() => {
       tip = document.createElement('div');
       tip.id = 'discover-bar-tooltip';
       tip.style.position = 'fixed';
-      tip.style.zIndex = '99999';
-      tip.style.background = '#111827';
-      tip.style.border = '1px solid rgba(255,255,255,0.2)';
+      tip.style.zIndex = '999999';
+      tip.style.background = 'rgba(15, 23, 42, 0.95)';
+      tip.style.backdropFilter = 'blur(8px)';
+      tip.style.border = '1px solid rgba(52, 211, 153, 0.35)';
       tip.style.borderRadius = '6px';
-      tip.style.padding = '6px 10px';
+      tip.style.padding = '6px 12px';
       tip.style.color = '#ffffff';
       tip.style.fontSize = '12px';
       tip.style.pointerEvents = 'none';
+      tip.style.whiteSpace = 'nowrap';
+      tip.style.boxShadow = '0 8px 24px rgba(0,0,0,0.6)';
       document.body.appendChild(tip);
     }
-    tip.innerHTML = `<strong>${timeStr}</strong>: ${count} hits`;
+    tip.innerHTML = `
+      <div style="font-weight:600; color:#f8fafc;">${timeStr}: <span style="color:#34d399;">${count} hit${count === 1 ? '' : 's'}</span></div>
+      <div style="font-size:10px; color:#94a3b8; margin-top:2px;">🔍 Click bar to zoom into this timeframe</div>
+    `;
     tip.style.display = 'block';
-    tip.style.left = `${e.clientX + 12}px`;
-    tip.style.top = `${e.clientY - 24}px`;
+
+    const tipRect = tip.getBoundingClientRect();
+    const tipWidth = tipRect.width || 180;
+    const tipHeight = tipRect.height || 42;
+
+    // Smart horizontal placement: if near right edge, flip to left of cursor
+    let left = e.clientX + 14;
+    if (left + tipWidth > window.innerWidth - 16) {
+      left = e.clientX - tipWidth - 14;
+    }
+    if (left < 10) left = 10;
+
+    // Smart vertical placement
+    let top = e.clientY - tipHeight - 10;
+    if (top < 10) {
+      top = e.clientY + 18;
+    }
+
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
   }
 
   function hideBarTooltip() {
     const tip = document.getElementById('discover-bar-tooltip');
     if (tip) tip.style.display = 'none';
+  }
+
+  function zoomToBucket(startMs, endMs) {
+    hideBarTooltip();
+    // Strictly lock zoom to the exact boundary of the clicked bar
+    const fromDate = new Date(startMs);
+    const toDate = new Date(endMs);
+
+    const timeLabel = `${fromDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'})} → ${toDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'})}`;
+
+    if (window.TimeRangePicker && window.TimeRangePicker.setAbsolute) {
+      window.TimeRangePicker.setAbsolute(fromDate, toDate, `🔍 ${timeLabel}`);
+    }
+
+    if (window.Toast) {
+      window.Toast.show({
+        type: 'info',
+        title: 'Zoomed View',
+        body: `Locked to bar interval: ${timeLabel}`,
+        duration: 2000,
+      });
+    }
+  }
+
+  function zoomIn() {
+    let from, to;
+    if (window.TimeRangePicker && window.TimeRangePicker.getRange) {
+      const r = window.TimeRangePicker.getRange();
+      if (r && r.from && r.to) {
+        from = r.from.getTime();
+        to = r.to.getTime();
+      }
+    }
+    if (!from || !to) {
+      const now = Date.now();
+      from = now - 24 * 3600 * 1000;
+      to = now;
+    }
+
+    const dur = to - from;
+    if (dur <= 10000) {
+      if (window.Toast) window.Toast.show({ type: 'warn', title: 'Maximum Zoom', body: 'Already at maximum zoom level (10 seconds)', duration: 1500 });
+      return;
+    }
+    const center = (from + to) / 2;
+    const newHalf = dur / 4;
+    const newFrom = new Date(center - newHalf);
+    const newTo = new Date(center + newHalf);
+
+    if (window.TimeRangePicker && window.TimeRangePicker.setAbsolute) {
+      window.TimeRangePicker.setAbsolute(newFrom, newTo, `🔍 Zoom In`);
+    }
+  }
+
+  function zoomOut() {
+    let from, to;
+    if (window.TimeRangePicker && window.TimeRangePicker.getRange) {
+      const r = window.TimeRangePicker.getRange();
+      if (r && r.from && r.to) {
+        from = r.from.getTime();
+        to = r.to.getTime();
+      }
+    }
+    if (!from || !to) {
+      const now = Date.now();
+      from = now - 24 * 3600 * 1000;
+      to = now;
+    }
+
+    const dur = to - from;
+    const center = (from + to) / 2;
+    const newHalf = dur;
+    const newFrom = new Date(center - newHalf);
+    const newTo = new Date(Math.min(Date.now(), center + newHalf));
+
+    if (window.TimeRangePicker && window.TimeRangePicker.setAbsolute) {
+      window.TimeRangePicker.setAbsolute(newFrom, newTo, `🔍 Zoom Out`);
+    }
+  }
+
+  function zoomFitHits() {
+    const logs = getFilteredLogs();
+    const times = logs.map(l => new Date(l.timestamp || l.receivedAt).getTime()).filter(t => !isNaN(t)).sort((a, b) => a - b);
+    if (times.length === 0) {
+      if (window.Toast) window.Toast.show({ type: 'info', title: 'Fit Hits', body: 'No events found to fit view', duration: 1500 });
+      return;
+    }
+
+    const minT = times[0];
+    const maxT = times[times.length - 1];
+    
+    // Fit precisely within the span of actual events
+    const newFrom = new Date(minT);
+    const newTo = new Date(maxT > minT ? maxT : minT + 60000);
+
+    if (window.TimeRangePicker && window.TimeRangePicker.setAbsolute) {
+      window.TimeRangePicker.setAbsolute(newFrom, newTo, `🎯 Fit: ${logs.length} Events`);
+    }
+    if (window.Toast) {
+      window.Toast.show({ type: 'success', title: 'Fit to Hits', body: `Zoomed precisely to all ${logs.length} events`, duration: 2000 });
+    }
+  }
+
+  function resetZoom() {
+    if (window.TimeRangePicker && window.TimeRangePicker.reset) {
+      window.TimeRangePicker.reset();
+    }
+    if (window.Toast) {
+      window.Toast.show({ type: 'info', title: 'Zoom Reset', body: 'Restored default full view', duration: 1500 });
+    }
   }
 
   function _escapeHtml(str) {
@@ -2636,6 +2807,11 @@ const DiscoverController = (() => {
     toggleFullscreen,
     showBarTooltip,
     hideBarTooltip,
+    zoomToBucket,
+    zoomIn,
+    zoomOut,
+    zoomFitHits,
+    resetZoom,
     toggleDatesPopover,
     closeDatesModal,
     toggleTimeRangePopover,

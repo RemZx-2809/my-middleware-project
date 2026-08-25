@@ -104,6 +104,35 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  /* ── Global Search Input Setup ──────────────────────────── */
+  const globalSearch = document.getElementById('search-input');
+  if (globalSearch) {
+    // Aggressive clear on boot to wipe any browser password-manager autofill
+    const clearSearch = () => { if (document.activeElement !== globalSearch) globalSearch.value = ''; };
+    clearSearch();
+    setTimeout(clearSearch, 100);
+    setTimeout(clearSearch, 500);
+    setTimeout(clearSearch, 1200);
+    window.addEventListener('load', clearSearch);
+
+    globalSearch.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const query = globalSearch.value.trim();
+        if (query) {
+          // Switch to Discover view and apply search
+          if (window.SidebarController && window.SidebarController.setActive) {
+            window.SidebarController.setActive('discover');
+          }
+          const discSearch = document.getElementById('discover-search-input');
+          if (discSearch) {
+            discSearch.value = query;
+            discSearch.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+      }
+    });
+  }
+
   /* ── Keyboard Shortcuts ────────────────────────────────── */
   document.addEventListener('keydown', (e) => {
     const tag = document.activeElement?.tagName;
