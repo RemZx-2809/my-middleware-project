@@ -2,6 +2,110 @@
   "critical_alerts": [],
   "blind_spots_agent_health": [
     {
+      "timestamp": "2026-08-25T09:14:50.060+0000",
+      "rule": {
+        "level": 7,
+        "description": "Listened ports status (netstat) changed (new port opened or closed).",
+        "id": "533",
+        "firedtimes": 2,
+        "mail": false,
+        "groups": [
+          "ossec"
+        ],
+        "pci_dss": [
+          "10.2.7",
+          "10.6.1"
+        ],
+        "gpg13": [
+          "10.1"
+        ],
+        "gdpr": [
+          "IV_35.7.d"
+        ],
+        "hipaa": [
+          "164.312.b"
+        ],
+        "nist_800_53": [
+          "AU.14",
+          "AU.6"
+        ],
+        "tsc": [
+          "CC6.8",
+          "CC7.2",
+          "CC7.3"
+        ]
+      },
+      "agent": {
+        "id": "000",
+        "name": "wazuh-server"
+      },
+      "manager": {
+        "name": "wazuh-server"
+      },
+      "id": "1787649290.7142785",
+      "previous_output": "Previous output:\nossec: output: 'netstat listening ports':\nudp        0      0 0.0.0.0:4789            0.0.0.0:*                           -                   \ntcp 0.0.0.0:22 0.0.0.0:* /usr\ntcp6 :::22 :::* /usr\nudp 127.0.0.1:323 0.0.0.0:* 3421/chronyd\nudp6 ::1:323 :::* 3421/chronyd\ntcp 0.0.0.0:443 0.0.0.0:* 2298678/node\nudp 0.0.0.0:514 0.0.0.0:* 3198298/wazuh-remot\ntcp 0.0.0.0:1514 0.0.0.0:* 3198296/wazuh-remot\ntcp 0.0.0.0:1515 0.0.0.0:* 3198144/wazuh-authd\ntcp6 :::2377 :::* 4161/dockerd\ntcp 127.0.0.1:3000 0.0.0.0:* 3221595/sshd\ntcp6 ::1:3000 :::* 3221595/sshd\ntcp 0.0.0.0:3001 0.0.0.0:* 2911252/docker-prox\ntcp6 :::3001 :::* 2911258/docker-prox\ntcp6 :::7946 :::* 4161/dockerd\nudp6 :::7946 :::* 4161/dockerd\ntcp 0.0.0.0:8080 0.0.0.0:* 2840393/docker-prox\ntcp6 :::8080 :::* 2840400/docker-prox\ntcp6 127.0.0.1:9200 :::* 2299830/java\ntcp6 127.0.0.1:9300 :::* 2299830/java\ntcp 127.0.0.1:34865 0.0.0.0:* 4065/containerd\ntcp 0.0.0.0:55000 0.0.0.0:* 3198091/python3\ntcp6 :::55000 :::* 3198091/python3",
+      "full_log": "ossec: output: 'netstat listening ports':\nudp        0      0 0.0.0.0:4789            0.0.0.0:*                           -                   \ntcp 0.0.0.0:22 0.0.0.0:* /usr\ntcp6 :::22 :::* /usr\nudp 127.0.0.1:323 0.0.0.0:* 3421/chronyd\nudp6 ::1:323 :::* 3421/chronyd\ntcp 0.0.0.0:443 0.0.0.0:* 2298678/node\nudp 0.0.0.0:514 0.0.0.0:* 3198298/wazuh-remot\ntcp 0.0.0.0:1514 0.0.0.0:* 3198296/wazuh-remot\ntcp 0.0.0.0:1515 0.0.0.0:* 3198144/wazuh-authd\ntcp6 :::2377 :::* 4161/dockerd\ntcp 127.0.0.1:3000 0.0.0.0:* 3224227/sshd\ntcp6 ::1:3000 :::* 3224227/sshd\ntcp 0.0.0.0:3001 0.0.0.0:* 2911252/docker-prox\ntcp6 :::3001 :::* 2911258/docker-prox\ntcp6 :::7946 :::* 4161/dockerd\nudp6 :::7946 :::* 4161/dockerd\ntcp 0.0.0.0:8080 0.0.0.0:* 2840393/docker-prox\ntcp6 :::8080 :::* 2840400/docker-prox\ntcp6 127.0.0.1:9200 :::* 2299830/java\ntcp6 127.0.0.1:9300 :::* 2299830/java\ntcp 127.0.0.1:34865 0.0.0.0:* 4065/containerd\ntcp 0.0.0.0:55000 0.0.0.0:* 3198091/python3\ntcp6 :::55000 :::* 3198091/python3",
+      "decoder": {
+        "name": "ossec"
+      },
+      "previous_log": "ossec: output: 'netstat listening ports':\nudp        0      0 0.0.0.0:4789            0.0.0.0:*                           -                   \ntcp 0.0.0.0:22 0.0.0.0:* /usr\ntcp6 :::22 :::* /usr\nudp 127.0.0.1:323 0.0.0.0:* 3421/chronyd\nudp6 ::1:323 :::* 3421/chronyd\ntcp 0.0.0.0:443 0.0.0.0:* 2298678/node\nudp 0.0.0.0:514 0.0.0.0:* 3198298/wazuh-remot\ntcp 0.0.0.0:1514 0.0.0.0:* 3198296/wazuh-remot\ntcp 0.0.0.0:1515 0.0.0.0:* 3198144/wazuh-authd\ntcp6 :::2377 :::* 4161/dockerd\ntcp 127.0.0.1:3000 0.0.0.0:* 3221595/sshd\ntcp6 ::1:3000 :::* 3221595/sshd\ntcp 0.0.0.0:3001 0.0.0.0:* 2911252/docker-prox\ntcp6 :::3001 :::* 2911258/docker-prox\ntcp6 :::7946 :::* 4161/dockerd\nudp6 :::7946 :::* 4161/dockerd\ntcp 0.0.0.0:8080 0.0.0.0:* 2840393/docker-prox\ntcp6 :::8080 :::* 2840400/docker-prox\ntcp6 127.0.0.1:9200 :::* 2299830/java\ntcp6 127.0.0.1:9300 :::* 2299830/java\ntcp 127.0.0.1:34865 0.0.0.0:* 4065/containerd\ntcp 0.0.0.0:55000 0.0.0.0:* 3198091/python3\ntcp6 :::55000 :::* 3198091/python3",
+      "location": "netstat listening ports",
+      "aegis_use_case": "blind_spots_agent_health",
+      "receivedAt": "2026-08-25T09:15:05.589354+00:00"
+    },
+    {
+      "timestamp": "2026-08-25T09:08:50.301+0000",
+      "rule": {
+        "level": 7,
+        "description": "Listened ports status (netstat) changed (new port opened or closed).",
+        "id": "533",
+        "firedtimes": 1,
+        "mail": false,
+        "groups": [
+          "ossec"
+        ],
+        "pci_dss": [
+          "10.2.7",
+          "10.6.1"
+        ],
+        "gpg13": [
+          "10.1"
+        ],
+        "gdpr": [
+          "IV_35.7.d"
+        ],
+        "hipaa": [
+          "164.312.b"
+        ],
+        "nist_800_53": [
+          "AU.14",
+          "AU.6"
+        ],
+        "tsc": [
+          "CC6.8",
+          "CC7.2",
+          "CC7.3"
+        ]
+      },
+      "agent": {
+        "id": "000",
+        "name": "wazuh-server"
+      },
+      "manager": {
+        "name": "wazuh-server"
+      },
+      "id": "1787648930.7061550",
+      "previous_output": "Previous output:\nossec: output: 'netstat listening ports':\nudp        0      0 0.0.0.0:4789            0.0.0.0:*                           -                   \ntcp 0.0.0.0:22 0.0.0.0:* /usr\ntcp6 :::22 :::* /usr\nudp 127.0.0.1:323 0.0.0.0:* 3421/chronyd\nudp6 ::1:323 :::* 3421/chronyd\ntcp 0.0.0.0:443 0.0.0.0:* 2298678/node\nudp 0.0.0.0:514 0.0.0.0:* 3198298/wazuh-remot\ntcp 0.0.0.0:1514 0.0.0.0:* 3198296/wazuh-remot\ntcp 0.0.0.0:1515 0.0.0.0:* 3198144/wazuh-authd\ntcp6 :::2377 :::* 4161/dockerd\ntcp 127.0.0.1:3000 0.0.0.0:* 3179803/sshd\ntcp6 ::1:3000 :::* 3179803/sshd\ntcp 0.0.0.0:3001 0.0.0.0:* 2911252/docker-prox\ntcp6 :::3001 :::* 2911258/docker-prox\ntcp6 :::7946 :::* 4161/dockerd\nudp6 :::7946 :::* 4161/dockerd\ntcp 0.0.0.0:8080 0.0.0.0:* 2840393/docker-prox\ntcp6 :::8080 :::* 2840400/docker-prox\ntcp6 127.0.0.1:9200 :::* 2299830/java\ntcp6 127.0.0.1:9300 :::* 2299830/java\ntcp 127.0.0.1:34865 0.0.0.0:* 4065/containerd\ntcp 0.0.0.0:55000 0.0.0.0:* 3198091/python3\ntcp6 :::55000 :::* 3198091/python3",
+      "full_log": "ossec: output: 'netstat listening ports':\nudp        0      0 0.0.0.0:4789            0.0.0.0:*                           -                   \ntcp 0.0.0.0:22 0.0.0.0:* /usr\ntcp6 :::22 :::* /usr\nudp 127.0.0.1:323 0.0.0.0:* 3421/chronyd\nudp6 ::1:323 :::* 3421/chronyd\ntcp 0.0.0.0:443 0.0.0.0:* 2298678/node\nudp 0.0.0.0:514 0.0.0.0:* 3198298/wazuh-remot\ntcp 0.0.0.0:1514 0.0.0.0:* 3198296/wazuh-remot\ntcp 0.0.0.0:1515 0.0.0.0:* 3198144/wazuh-authd\ntcp6 :::2377 :::* 4161/dockerd\ntcp 127.0.0.1:3000 0.0.0.0:* 3221595/sshd\ntcp6 ::1:3000 :::* 3221595/sshd\ntcp 0.0.0.0:3001 0.0.0.0:* 2911252/docker-prox\ntcp6 :::3001 :::* 2911258/docker-prox\ntcp6 :::7946 :::* 4161/dockerd\nudp6 :::7946 :::* 4161/dockerd\ntcp 0.0.0.0:8080 0.0.0.0:* 2840393/docker-prox\ntcp6 :::8080 :::* 2840400/docker-prox\ntcp6 127.0.0.1:9200 :::* 2299830/java\ntcp6 127.0.0.1:9300 :::* 2299830/java\ntcp 127.0.0.1:34865 0.0.0.0:* 4065/containerd\ntcp 0.0.0.0:55000 0.0.0.0:* 3198091/python3\ntcp6 :::55000 :::* 3198091/python3",
+      "decoder": {
+        "name": "ossec"
+      },
+      "previous_log": "ossec: output: 'netstat listening ports':\nudp        0      0 0.0.0.0:4789            0.0.0.0:*                           -                   \ntcp 0.0.0.0:22 0.0.0.0:* /usr\ntcp6 :::22 :::* /usr\nudp 127.0.0.1:323 0.0.0.0:* 3421/chronyd\nudp6 ::1:323 :::* 3421/chronyd\ntcp 0.0.0.0:443 0.0.0.0:* 2298678/node\nudp 0.0.0.0:514 0.0.0.0:* 3198298/wazuh-remot\ntcp 0.0.0.0:1514 0.0.0.0:* 3198296/wazuh-remot\ntcp 0.0.0.0:1515 0.0.0.0:* 3198144/wazuh-authd\ntcp6 :::2377 :::* 4161/dockerd\ntcp 127.0.0.1:3000 0.0.0.0:* 3179803/sshd\ntcp6 ::1:3000 :::* 3179803/sshd\ntcp 0.0.0.0:3001 0.0.0.0:* 2911252/docker-prox\ntcp6 :::3001 :::* 2911258/docker-prox\ntcp6 :::7946 :::* 4161/dockerd\nudp6 :::7946 :::* 4161/dockerd\ntcp 0.0.0.0:8080 0.0.0.0:* 2840393/docker-prox\ntcp6 :::8080 :::* 2840400/docker-prox\ntcp6 127.0.0.1:9200 :::* 2299830/java\ntcp6 127.0.0.1:9300 :::* 2299830/java\ntcp 127.0.0.1:34865 0.0.0.0:* 4065/containerd\ntcp 0.0.0.0:55000 0.0.0.0:* 3198091/python3\ntcp6 :::55000 :::* 3198091/python3",
+      "location": "netstat listening ports",
+      "aegis_use_case": "blind_spots_agent_health",
+      "receivedAt": "2026-08-25T09:09:07.976608+00:00"
+    },
+    {
       "timestamp": "2026-08-25T08:38:50.121+0000",
       "rule": {
         "level": 7,
@@ -107,6 +211,77 @@
     }
   ],
   "critical_file_changes": [],
-  "auth_access_anomalies": [],
+  "auth_access_anomalies": [
+    {
+      "timestamp": "2026-08-25T09:12:02.763+0000",
+      "rule": {
+        "level": 10,
+        "description": "syslog: User missed the password more than one time",
+        "id": "2502",
+        "mitre": {
+          "id": [
+            "T1110"
+          ],
+          "tactic": [
+            "Credential Access"
+          ],
+          "technique": [
+            "Brute Force"
+          ]
+        },
+        "firedtimes": 1,
+        "mail": false,
+        "groups": [
+          "syslog",
+          "access_control",
+          "authentication_failed"
+        ],
+        "pci_dss": [
+          "10.2.4",
+          "10.2.5"
+        ],
+        "gpg13": [
+          "7.8"
+        ],
+        "gdpr": [
+          "IV_35.7.d",
+          "IV_32.2"
+        ],
+        "hipaa": [
+          "164.312.b"
+        ],
+        "nist_800_53": [
+          "AU.14",
+          "AC.7"
+        ],
+        "tsc": [
+          "CC6.1",
+          "CC6.8",
+          "CC7.2",
+          "CC7.3"
+        ]
+      },
+      "agent": {
+        "id": "000",
+        "name": "wazuh-server"
+      },
+      "manager": {
+        "name": "wazuh-server"
+      },
+      "id": "1787649122.7111966",
+      "full_log": "Aug 25 09:11:46 wazuh-server sshd[3224392]: PAM 2 more authentication failures; logname= uid=0 euid=0 tty=ssh ruser= rhost=10.212.135.102",
+      "predecoder": {
+        "program_name": "sshd",
+        "timestamp": "Aug 25 09:11:46",
+        "hostname": "wazuh-server"
+      },
+      "decoder": {
+        "name": "sshd"
+      },
+      "location": "journald",
+      "aegis_use_case": "auth_access_anomalies",
+      "receivedAt": "2026-08-25T09:12:19.905201+00:00"
+    }
+  ],
   "threat_intel_matches": []
 }

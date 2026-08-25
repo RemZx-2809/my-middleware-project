@@ -20,7 +20,7 @@ const RULES_DIR   = path.join(__dirname, 'rules');
 if (!fs.existsSync(RULES_DIR)) fs.mkdirSync(RULES_DIR, { recursive: true });
 
 const { logAudit, getAuditLogs, clearAuditLogs } = require('./services/auditLog');
-const { testConnection: testRedmineConnection, createIssueFromAlert: createRedmineIssue, syncResolvedIssues: syncRedmineIssues, shouldTriggerTicket } = require('./services/redmine');
+const { testConnection: testRedmineConnection, createIssueFromAlert: createRedmineIssue, syncResolvedIssues: syncRedmineIssues, shouldTriggerTicket, clearDedupForIssue } = require('./services/redmine');
 const { addResolvedRecord, getResolvedHistory, deleteResolvedRecord, deleteMultipleResolvedRecords, clearResolvedHistory, syncClosedIssuesFromRedmine } = require('./services/resolvedHistory');
 
 /* ════════════════════════════════════════════════════════════
@@ -345,6 +345,61 @@ function storeAlert(alert, isLiveWebhook = false) {
 
   return true;
 }
+
+/**
+ * Purge resolved alerts from active store when an issue is closed in Redmine
+ * and reset the deduplication cache for that item.
+ */
+function purgeResolvedAlertsFromStore(closedRecord) {
+  if (!closedRecord) return 0;
+  const dLow = String(closedRecord.targetDevice || '').toLowerCase().trim();
+  const rLow = String(closedRecord.ruleId || '').toLowerCase().trim();
+  const fLow = String(closedRecord.targetFile || '').toLowerCase().trim();
+  const issueId = closedRecord.issueId ? String(closedRecord.issueId) : '';
+
+  let totalPurged = 0;
+  for (const cat of Object.keys(store)) {
+    if (!Array.isArray(store[cat])) continue;
+    const initialLen = store[cat].length;
+    store[cat] = store[cat].filter(alert => {
+      const alertAgent = String(alert?.agent?.name || alert?.agent?.id || alert?.data?.devname || '').toLowerCase();
+      const alertRule = String(alert?.rule?.id || '').toLowerCase();
+      const alertFile = String(alert?.syscheck?.path || alert?.data?.path || alert?.data?.srcip || '').toLowerCase();
+
+      let match = true;
+      if (rLow && alertRule && alertRule !== rLow) match = false;
+      if (dLow && dLow !== 'unknown device' && alertAgent && !alertAgent.includes(dLow) && !dLow.includes(alertAgent)) match = false;
+      if (fLow && alertFile && !alertFile.includes(fLow) && !fLow.includes(alertFile)) match = false;
+
+      // If matched with meaningful criteria, purge this alert from active store
+      if (match && (rLow || fLow || (dLow && dLow !== 'unknown device'))) {
+        return false; // remove from active store
+      }
+      return true; // keep
+    });
+    totalPurged += (initialLen - store[cat].length);
+  }
+
+  if (totalPurged > 0) {
+    _saveStore(true);
+    sseBroadcast('sync-done', { accepted: 0, categories: Object.fromEntries(Object.entries(store).map(([k, v]) => [k, v.length])) });
+    console.log(`[AEGIS] Purged ${totalPurged} resolved alert(s) from Active Store for Closed Issue #${issueId || 'N/A'} (Device: ${closedRecord.targetDevice}, Rule: ${closedRecord.ruleId}, File: ${closedRecord.targetFile})`);
+  }
+
+  // Reset deduplication cache for this resolved item so new future alerts will be accepted
+  clearDedupForIssue(closedRecord.targetDevice, closedRecord.ruleId, closedRecord.targetFile);
+
+  return totalPurged;
+}
+
+// Background auto-sync closed issues from Redmine every 60 seconds
+setInterval(async () => {
+  if (_config.redmineUrl && _config.redmineApiKey && _config.redmineAutoTicket) {
+    try {
+      await syncClosedIssuesFromRedmine(_config, purgeResolvedAlertsFromStore);
+    } catch (_) {}
+  }
+}, 60000).unref();
 
 /* ════════════════════════════════════════════════════════════
    SSE
@@ -1026,7 +1081,7 @@ const server = http.createServer(async (req, res) => {
         const ruleMatch = desc.match(/\*Rule ID:\*\s*([^\n\r]+)/i) || (issue.subject || '').match(/Rule\s*#?([0-9]+)/i);
         if (ruleMatch) ruleId = ruleMatch[1].trim();
 
-        await addResolvedRecord({
+        const closedRecord = {
           id: `res-redmine-${issue.id}`,
           issueId: issue.id,
           subject: issue.subject,
@@ -1041,7 +1096,10 @@ const server = http.createServer(async (req, res) => {
           resolutionNotes: body.journal?.notes || issue.description || 'Closed in Redmine',
           issueUrl,
           description: desc,
-        }).catch(() => {});
+        };
+
+        await addResolvedRecord(closedRecord).catch(() => {});
+        purgeResolvedAlertsFromStore(closedRecord);
       }
 
       await logAudit({
@@ -1079,7 +1137,7 @@ const server = http.createServer(async (req, res) => {
     if (!enforceRateLimit(`resolved_sync:${remoteIp}`, 60000, 15)) return;
 
     try {
-      const result = await syncClosedIssuesFromRedmine(_config);
+      const result = await syncClosedIssuesFromRedmine(_config, purgeResolvedAlertsFromStore);
       return json(res, result.ok ? 200 : 400, result);
     } catch (e) {
       return json(res, 500, { ok: false, error: e.message });

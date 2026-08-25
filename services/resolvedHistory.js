@@ -203,8 +203,9 @@ function _redmineRequest(endpoint, { baseUrl, apiKey }) {
 
 /**
  * Sync Closed/Resolved issues from Redmine into permanent resolved history
+ * If purgeCallback is provided, calls purgeCallback(closedRecord) to remove active alerts and reset dedup.
  */
-async function syncClosedIssuesFromRedmine(config = {}) {
+async function syncClosedIssuesFromRedmine(config = {}, purgeCallback = null) {
   const baseUrl = config.redmineUrl;
   const apiKey  = config.redmineApiKey;
   const project = config.redmineProject;
@@ -222,6 +223,8 @@ async function syncClosedIssuesFromRedmine(config = {}) {
     const issues = res?.issues || [];
 
     let newSavedCount = 0;
+    const closedList = [];
+
     for (const is of issues) {
       const issueUrl = `${baseUrl.replace(/\/+$/, '')}/issues/${is.id}`;
 
@@ -258,13 +261,23 @@ async function syncClosedIssuesFromRedmine(config = {}) {
       };
 
       await addResolvedRecord(closedRecord);
+      closedList.push(closedRecord);
       newSavedCount++;
+
+      if (typeof purgeCallback === 'function') {
+        try {
+          purgeCallback(closedRecord);
+        } catch (e) {
+          console.warn('[ResolvedHistory] Purge callback error:', e.message);
+        }
+      }
     }
 
     return {
       ok: true,
       syncedCount: newSavedCount,
       totalResolved: _resolvedStore.length,
+      closedRecords: closedList,
     };
   } catch (err) {
     return { ok: false, error: err.message };

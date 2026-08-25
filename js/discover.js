@@ -192,6 +192,62 @@ const DiscoverController = (() => {
     }
   }
 
+  let _groupDuplicates = true;
+
+  function toggleGroupDuplicates() {
+    _groupDuplicates = !_groupDuplicates;
+    const btn = document.getElementById('discover-dedup-btn');
+    if (btn) {
+      btn.classList.toggle('active', _groupDuplicates);
+      const lbl = document.getElementById('discover-dedup-label');
+      if (lbl) lbl.textContent = _groupDuplicates ? 'Group Duplicates' : 'All Events';
+    }
+    _pagination.currentPage = 1;
+    renderAll();
+    if (window.Toast) {
+      window.Toast.show({
+        type: 'info',
+        title: _groupDuplicates ? 'Deduplication Active' : 'Showing All Events',
+        body: _groupDuplicates ? 'Repeated alerts on the same device & rule/file are grouped' : 'Displaying all raw occurrences',
+        duration: 2000,
+      });
+    }
+  }
+
+  function _applyDeduplication(logs) {
+    if (!_groupDuplicates) return logs;
+
+    const groupMap = new Map();
+    for (const log of logs) {
+      const agent = log?.agent?.name || log?.manager?.name || 'agent';
+      const ruleId = log?.rule?.id || log?.rule?.description || 'rule';
+      const fileOrTarget = log?.syscheck?.path || log?.data?.path || log?.data?.srcip || log?.location || '';
+      const key = `${agent}::${ruleId}::${fileOrTarget}`.toLowerCase();
+
+      if (!groupMap.has(key)) {
+        groupMap.set(key, {
+          ...log,
+          _repeatCount: 1,
+        });
+      } else {
+        const existing = groupMap.get(key);
+        existing._repeatCount = (existing._repeatCount || 1) + 1;
+
+        // Keep the latest timestamp as the display timestamp
+        const existTime = new Date(existing.timestamp || existing.receivedAt || 0).getTime();
+        const thisTime = new Date(log.timestamp || log.receivedAt || 0).getTime();
+        if (thisTime > existTime) {
+          existing.timestamp = log.timestamp;
+          existing.receivedAt = log.receivedAt;
+          existing.rule = log.rule;
+          existing.full_log = log.full_log;
+          existing.previous_output = log.previous_output;
+        }
+      }
+    }
+    return Array.from(groupMap.values());
+  }
+
   function getFilteredLogs() {
     let logs = _allLogs;
 
@@ -234,7 +290,7 @@ const DiscoverController = (() => {
       }
     }
 
-    return logs;
+    return _applyDeduplication(logs);
   }
 
   function renderAll() {
@@ -576,7 +632,10 @@ const DiscoverController = (() => {
         } else if (col === 'agent.name') {
           cellsHtml += `<td class="cell-agent">${val}</td>`;
         } else if (col === 'rule.description') {
-          cellsHtml += `<td class="cell-desc">${_escapeHtml(val)}</td>`;
+          const repeatBadge = (log._repeatCount && log._repeatCount > 1)
+            ? `<span class="badge-repeat-count" title="Repeated ${log._repeatCount} times on ${log?.agent?.name || 'device'}">(${log._repeatCount}x)</span> `
+            : '';
+          cellsHtml += `<td class="cell-desc">${repeatBadge}${_escapeHtml(val)}</td>`;
         } else {
           cellsHtml += `<td style="font-family:var(--font-mono); font-size:12px; color:#cbd5e1;">${_escapeHtml(String(val))}</td>`;
         }
@@ -2257,11 +2316,24 @@ const DiscoverController = (() => {
     }
   }
 
+  function _cleanLogForDisplay(log) {
+    if (!log || typeof log !== 'object') return log;
+    const clean = {};
+    for (const [k, v] of Object.entries(log)) {
+      if (!k.startsWith('_')) {
+        clean[k] = v;
+      }
+    }
+    return clean;
+  }
+
   function _renderDrawerKVTable(log) {
+    const clean = _cleanLogForDisplay(log);
     const flattened = [];
     function _traverse(obj, prefix = '') {
       if (!obj || typeof obj !== 'object') return;
       for (const [k, v] of Object.entries(obj)) {
+        if (k.startsWith('_')) continue;
         const fullKey = prefix ? `${prefix}.${k}` : k;
         if (v && typeof v === 'object' && !Array.isArray(v)) {
           _traverse(v, fullKey);
@@ -2270,7 +2342,7 @@ const DiscoverController = (() => {
         }
       }
     }
-    _traverse(log);
+    _traverse(clean);
 
     let kvHtml = `<table class="kv-table">`;
     flattened.forEach(f => {
@@ -2290,7 +2362,8 @@ const DiscoverController = (() => {
   }
 
   function _renderDrawerJSONView(log) {
-    const jsonStr = JSON.stringify(log, null, 2);
+    const clean = _cleanLogForDisplay(log);
+    const jsonStr = JSON.stringify(clean, null, 2);
     return `<div class="doc-json-view">${_escapeHtml(jsonStr)}</div>`;
   }
 
@@ -2570,6 +2643,7 @@ const DiscoverController = (() => {
     viewSurroundingDocs,
     viewSingleDoc,
     closeDocSidePanel,
+    toggleGroupDuplicates,
   };
 })();
 

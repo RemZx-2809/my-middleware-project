@@ -971,6 +971,10 @@
           </div>
 
           <div class="discover-actions-right">
+            <button class="action-btn active" id="discover-dedup-btn" title="Toggle grouping / deduplication of repeated alerts" onclick="DiscoverController.toggleGroupDuplicates()">
+              <i data-lucide="layers" style="width:13px;height:13px;"></i>
+              <span id="discover-dedup-label">Group Duplicates</span>
+            </button>
             <button class="action-btn" id="discover-export-btn" title="Export matching logs as JSON/CSV">
               <i data-lucide="download" style="width:13px;height:13px;"></i>
               Export Formatted

@@ -2185,6 +2185,31 @@ tr.doc-row--active td {
   display: block;
 }
 
+/* ── Deduplication Repeat Count Badge ── */
+.badge-repeat-count {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 12px;
+  background: rgba(56, 189, 248, 0.16);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+
+#discover-dedup-btn.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #38bdf8;
+}
+#discover-dedup-btn.active svg {
+  color: #38bdf8;
+}
+
 
 /* ════════════════════════════════════════════════════════════
    DATABASE STORAGE VIEW

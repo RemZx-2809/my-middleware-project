@@ -343,7 +343,37 @@ async function syncResolvedIssues(config = {}) {
 }
 
 /**
- * Clear deduplication cache (useful for testing or manual reset)
+ * Clear deduplication cache for a specific resolved issue (targetDevice, ruleId, targetFile)
+ */
+function clearDedupForIssue(targetDevice = '', ruleId = '', targetFile = '') {
+  const dLow = String(targetDevice || '').toLowerCase();
+  const rLow = String(ruleId || '').toLowerCase();
+  const fLow = String(targetFile || '').toLowerCase();
+
+  let clearedCount = 0;
+  for (const [key] of _dedupCache) {
+    const parts = key.split('::');
+    const kRule = parts[0] || '';
+    const kAgent = parts[1] || '';
+    const kDev = parts[2] || '';
+    const kFile = parts[3] || '';
+
+    let match = true;
+    if (rLow && kRule && !kRule.includes(rLow) && !rLow.includes(kRule)) match = false;
+    if (dLow && (kAgent || kDev) && !dLow.includes(kAgent) && !kAgent.includes(dLow)) match = false;
+    if (fLow && kFile && !fLow.includes(kFile) && !kFile.includes(fLow)) match = false;
+
+    if (match) {
+      _dedupCache.delete(key);
+      clearedCount++;
+      console.log(`[Redmine Dedup] Reset dedup key after issue resolution: ${key}`);
+    }
+  }
+  return clearedCount;
+}
+
+/**
+ * Clear all deduplication cache (useful for testing or manual reset)
  */
 function clearDedupCache() {
   _dedupCache.clear();
@@ -354,5 +384,6 @@ module.exports = {
   createIssueFromAlert,
   syncResolvedIssues,
   shouldTriggerTicket,
+  clearDedupForIssue,
   clearDedupCache,
 };
