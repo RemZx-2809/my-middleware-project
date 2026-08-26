@@ -351,30 +351,36 @@ function storeAlert(alert, isLiveWebhook = false) {
  * and reset the deduplication cache for that item.
  */
 function purgeResolvedAlertsFromStore(closedRecord) {
-  if (!closedRecord) return 0;
-  const dLow = String(closedRecord.targetDevice || '').toLowerCase().trim();
-  const rLow = String(closedRecord.ruleId || '').toLowerCase().trim();
-  const fLow = String(closedRecord.targetFile || '').toLowerCase().trim();
-  const issueId = closedRecord.issueId ? String(closedRecord.issueId) : '';
+  if (!closedRecord || !closedRecord.issueId) return 0;
+  const issueId = String(closedRecord.issueId);
+  const desc = closedRecord.description || '';
+
+  // Extract specific alert IDs from ticket description (e.g. from Batch raw payload)
+  const alertIdsInDesc = new Set();
+  const rawIdMatches = desc.matchAll(/"id":\s*"([^"]+)"/g);
+  for (const m of rawIdMatches) {
+    if (m[1]) alertIdsInDesc.add(m[1]);
+  }
 
   let totalPurged = 0;
   for (const cat of Object.keys(store)) {
     if (!Array.isArray(store[cat])) continue;
     const initialLen = store[cat].length;
     store[cat] = store[cat].filter(alert => {
-      const alertAgent = String(alert?.agent?.name || alert?.agent?.id || alert?.data?.devname || '').toLowerCase();
-      const alertRule = String(alert?.rule?.id || '').toLowerCase();
-      const alertFile = String(alert?.syscheck?.path || alert?.data?.path || alert?.data?.srcip || '').toLowerCase();
+      const alertId = String(alert?.id || alert?._id || '');
+      const alertTicketId = String(alert?.redmine_ticket?.id || '');
 
-      let match = true;
-      if (rLow && alertRule && alertRule !== rLow) match = false;
-      if (dLow && dLow !== 'unknown device' && alertAgent && !alertAgent.includes(dLow) && !dLow.includes(alertAgent)) match = false;
-      if (fLow && alertFile && !alertFile.includes(fLow) && !fLow.includes(alertFile)) match = false;
-
-      // If matched with meaningful criteria, purge this alert from active store
-      if (match && (rLow || fLow || (dLow && dLow !== 'unknown device'))) {
-        return false; // remove from active store
+      // 1. Direct ticket ID match (this alert opened this ticket)
+      if (alertTicketId && alertTicketId === issueId) {
+        return false; // remove resolved alert
       }
+
+      // 2. Direct alert ID match from ticket batch payload
+      if (alertId && alertIdsInDesc.has(alertId)) {
+        return false; // remove resolved alert
+      }
+
+      // NEVER purge any alert that does not belong to this specific ticket!
       return true; // keep
     });
     totalPurged += (initialLen - store[cat].length);
@@ -383,7 +389,7 @@ function purgeResolvedAlertsFromStore(closedRecord) {
   if (totalPurged > 0) {
     _saveStore(true);
     sseBroadcast('sync-done', { accepted: 0, categories: Object.fromEntries(Object.entries(store).map(([k, v]) => [k, v.length])) });
-    console.log(`[AEGIS] Purged ${totalPurged} resolved alert(s) from Active Store for Closed Issue #${issueId || 'N/A'} (Device: ${closedRecord.targetDevice}, Rule: ${closedRecord.ruleId}, File: ${closedRecord.targetFile})`);
+    console.log(`[AEGIS] Purged ${totalPurged} resolved alert(s) from Active Store for Closed Issue #${issueId}`);
   }
 
   // Reset deduplication cache for this resolved item so new future alerts will be accepted

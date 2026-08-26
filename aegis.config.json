@@ -10,7 +10,7 @@
   "redmineCustomRules": "",
   "redmineDedupHours": "24",
   "redmineAutoTicket": true,
-  "ingestSince": "auto",
+  "ingestSince": "2026-08-01T00:00:00Z",
   "sshAutoTunnel": true,
   "sshHost": "10.145.10.57",
   "sshUser": "tawaikiar_p"

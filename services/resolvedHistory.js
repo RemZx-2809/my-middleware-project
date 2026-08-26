@@ -260,11 +260,13 @@ async function syncClosedIssuesFromRedmine(config = {}, purgeCallback = null) {
         description: desc,
       };
 
+      const isNewClosed = !_resolvedStore.some(r => r.issueId === is.id || r.id === `res-redmine-${is.id}`);
+
       await addResolvedRecord(closedRecord);
       closedList.push(closedRecord);
-      newSavedCount++;
+      if (isNewClosed) newSavedCount++;
 
-      if (typeof purgeCallback === 'function') {
+      if (isNewClosed && typeof purgeCallback === 'function') {
         try {
           purgeCallback(closedRecord);
         } catch (e) {

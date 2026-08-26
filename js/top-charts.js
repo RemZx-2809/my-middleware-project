@@ -538,19 +538,23 @@ const TopChartsController = (() => {
     });
 
     const activeLevels = Object.keys(levelTotals).sort((a, b) => levelTotals[b] - levelTotals[a]).slice(0, 10);
-    const targetLevels = activeLevels.length > 0 ? activeLevels : ['4', '6', '11'];
+    const targetLevels = activeLevels;
 
     if (legendEl) {
-      legendEl.innerHTML = targetLevels.map(lvl => {
-        const color = LEVEL_COLORS[lvl] || '#50b59b';
-        const count = levelTotals[lvl] || 0;
-        return `
-          <div class="top-chart-legend-item" data-level="${lvl}" title="Click to filter Alert Level ${lvl} (${count} events)">
-            <span class="legend-dot" style="background-color: ${color};"></span>
-            <span class="legend-label">${lvl}</span>
-          </div>
-        `;
-      }).join('');
+      if (targetLevels.length === 0) {
+        legendEl.innerHTML = '';
+      } else {
+        legendEl.innerHTML = targetLevels.map(lvl => {
+          const color = LEVEL_COLORS[lvl] || '#50b59b';
+          const count = levelTotals[lvl] || 0;
+          return `
+            <div class="top-chart-legend-item" data-level="${lvl}" title="Click to filter Alert Level ${lvl} (${count} events)">
+              <span class="legend-dot" style="background-color: ${color};"></span>
+              <span class="legend-label">${lvl}</span>
+            </div>
+          `;
+        }).join('');
+      }
 
       legendEl.querySelectorAll('.top-chart-legend-item').forEach(item => {
         const lvl = item.getAttribute('data-level');
