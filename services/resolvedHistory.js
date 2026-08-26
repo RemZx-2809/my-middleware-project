@@ -100,13 +100,24 @@ async function addResolvedRecord(entry) {
   };
 
   if (existingIdx >= 0) {
-    _resolvedStore[existingIdx] = { ..._resolvedStore[existingIdx], ...record };
+    const existing = _resolvedStore[existingIdx];
+    const hasChanged = existing.subject !== record.subject ||
+                       existing.status !== record.status ||
+                       existing.closedAt !== record.closedAt ||
+                       existing.priority !== record.priority ||
+                       existing.closedBy !== record.closedBy ||
+                       existing.description !== record.description ||
+                       existing.resolutionNotes !== record.resolutionNotes;
+    if (hasChanged) {
+      _resolvedStore[existingIdx] = { ...existing, ...record, syncedAt: new Date().toISOString() };
+      _saveStore();
+    }
+    return _resolvedStore[existingIdx];
   } else {
     _resolvedStore.unshift(record);
+    _saveStore();
+    return record;
   }
-
-  _saveStore();
-  return record;
 }
 
 /**
