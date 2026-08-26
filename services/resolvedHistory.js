@@ -14,7 +14,8 @@ const { URL } = require('url');
 const http  = require('http');
 const https = require('https');
 
-const HISTORY_FILE = path.join(__dirname, '..', 'resolved_history.json');
+const HISTORY_FILE   = path.join(__dirname, '..', 'resolved_history.json');
+const TOMBSTONE_FILE = path.join(__dirname, '..', 'resolved_tombstones.json');
 
 /* ── Lightweight UUID ─────────────────────────────────────── */
 function pseudoUUID() {
@@ -22,8 +23,27 @@ function pseudoUUID() {
   return `${hex()}${hex()}-${hex()}-4${hex().slice(1)}-${((Math.random() * 4) | 8).toString(16)}${hex().slice(1)}-${hex()}${hex()}${hex()}`;
 }
 
-/* ── In-Memory Store ───────────────────────────────────────── */
+/* ── In-Memory Store & Tombstones ──────────────────────────── */
 let _resolvedStore = [];
+let _tombstones = new Set();
+
+function _loadTombstones() {
+  try {
+    if (fs.existsSync(TOMBSTONE_FILE)) {
+      const raw = fs.readFileSync(TOMBSTONE_FILE, 'utf8');
+      const data = JSON.parse(raw);
+      if (Array.isArray(data)) {
+        _tombstones = new Set(data.map(String));
+      }
+    }
+  } catch (_) {}
+}
+
+function _saveTombstones() {
+  try {
+    fs.writeFileSync(TOMBSTONE_FILE, JSON.stringify(Array.from(_tombstones), null, 2), 'utf8');
+  } catch (_) {}
+}
 
 function _loadStore() {
   try {
@@ -38,7 +58,6 @@ function _loadStore() {
   } catch (err) {
     console.warn('[ResolvedHistory] Could not read resolved_history.json:', err.message);
   }
-  // Store defaults to empty array; real resolved issues will be synced from Redmine
 }
 
 function _saveStore() {
@@ -52,6 +71,7 @@ function _saveStore() {
 }
 
 _loadStore();
+_loadTombstones();
 
 /**
  * Add or update a resolved vulnerability record
@@ -116,6 +136,13 @@ async function getResolvedHistory({ search = '', limit = 500 } = {}) {
  */
 async function deleteResolvedRecord(id) {
   _loadStore();
+  _loadTombstones();
+  const target = _resolvedStore.find(r => r.id === id || String(r.issueId) === String(id));
+  if (target) {
+    if (target.id) _tombstones.add(String(target.id));
+    if (target.issueId) _tombstones.add(String(target.issueId));
+    _saveTombstones();
+  }
   const beforeLen = _resolvedStore.length;
   _resolvedStore = _resolvedStore.filter(r => r.id !== id && String(r.issueId) !== String(id));
   if (_resolvedStore.length !== beforeLen) {
@@ -130,7 +157,15 @@ async function deleteResolvedRecord(id) {
  */
 async function deleteMultipleResolvedRecords(ids = []) {
   _loadStore();
+  _loadTombstones();
   const idSet = new Set(ids.map(String));
+  for (const r of _resolvedStore) {
+    if (idSet.has(String(r.id)) || (r.issueId && idSet.has(String(r.issueId)))) {
+      if (r.id) _tombstones.add(String(r.id));
+      if (r.issueId) _tombstones.add(String(r.issueId));
+    }
+  }
+  _saveTombstones();
   const beforeLen = _resolvedStore.length;
   _resolvedStore = _resolvedStore.filter(r => !idSet.has(String(r.id)) && !idSet.has(String(r.issueId)));
   const deletedCount = beforeLen - _resolvedStore.length;
@@ -144,6 +179,13 @@ async function deleteMultipleResolvedRecords(ids = []) {
  * Clear all resolved history records
  */
 async function clearResolvedHistory() {
+  _loadStore();
+  _loadTombstones();
+  for (const r of _resolvedStore) {
+    if (r.id) _tombstones.add(String(r.id));
+    if (r.issueId) _tombstones.add(String(r.issueId));
+  }
+  _saveTombstones();
   _resolvedStore = [];
   _saveStore();
   return true;
@@ -222,10 +264,17 @@ async function syncClosedIssuesFromRedmine(config = {}, purgeCallback = null) {
     const res = await _redmineRequest(query, { baseUrl, apiKey });
     const issues = res?.issues || [];
 
+    _loadTombstones();
     let newSavedCount = 0;
     const closedList = [];
 
     for (const is of issues) {
+      const issueIdStr = String(is.id);
+      const recordIdStr = `res-redmine-${is.id}`;
+      if (_tombstones.has(issueIdStr) || _tombstones.has(recordIdStr)) {
+        // Explicitly deleted by user from History — do not re-insert or resurrect
+        continue;
+      }
       const issueUrl = `${baseUrl.replace(/\/+$/, '')}/issues/${is.id}`;
 
       // Extract device and file info from description or subject if present
