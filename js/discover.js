@@ -522,10 +522,15 @@ const DiscoverController = (() => {
     const hitsSubEl   = document.getElementById('discover-hits-sub');
 
     const filtered = getFilteredLogs();
-    const count = filtered.length;
+    const groupCount = filtered.length;
+    const totalRawCount = filtered.reduce((sum, l) => sum + (l._repeatCount || 1), 0);
 
     if (hitsCountEl) {
-      hitsCountEl.innerHTML = `${count.toLocaleString()} <span class="hits-label">hits</span> <svg class="hits-info-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+      if (_groupDuplicates && totalRawCount !== groupCount) {
+        hitsCountEl.innerHTML = `${totalRawCount.toLocaleString()} <span class="hits-label">hits</span> <span style="font-size:12px; font-weight:400; color:#94a3b8; margin-left:4px;">(${groupCount} grouped)</span> <svg class="hits-info-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+      } else {
+        hitsCountEl.innerHTML = `${groupCount.toLocaleString()} <span class="hits-label">hits</span> <svg class="hits-info-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+      }
     }
 
     if (hitsSubEl) {

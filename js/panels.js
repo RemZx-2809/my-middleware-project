@@ -178,7 +178,6 @@ const PanelManager = (() => {
       rowsId:  'blind-spots-rows',
       renderer: _renderBlindSpotAlert,
       kpiDir:  'up',
-      kpiMode: 'devices',  // show unique device names count
     },
     critical_file_changes: {
       panelId: 'panel-file-changes',
@@ -243,11 +242,7 @@ const PanelManager = (() => {
     if (!alerts || alerts.length === 0) {
       container.innerHTML = '';
       setState(mapping.panelId, 'empty');
-      if (mapping.kpiMode === 'devices') {
-        _updateKpiDevices(mapping.kpiId, 0, mapping.kpiDir);
-      } else {
-        _updateKpi(mapping.kpiId, 0, mapping.kpiDir);
-      }
+      _updateKpi(mapping.kpiId, 0, mapping.kpiDir);
       const panel = document.getElementById(mapping.panelId);
       const badge = panel?.querySelector('.panel-count-badge');
       if (badge) badge.textContent = '0';
@@ -271,17 +266,8 @@ const PanelManager = (() => {
     const panel = document.getElementById(mapping.panelId);
     const badge = panel?.querySelector('.panel-count-badge');
 
-    // For blind_spots: KPI and badge show unique device names count
-    if (mapping.kpiMode === 'devices') {
-      const uniqueDevices = new Set(
-        alerts.map(a => a.agent?.name ?? 'unknown').filter(Boolean)
-      );
-      _updateKpiDevices(mapping.kpiId, uniqueDevices.size, mapping.kpiDir);
-      if (badge) badge.textContent = uniqueDevices.size;
-    } else {
-      _updateKpi(mapping.kpiId, rowCount, mapping.kpiDir);
-      if (badge) badge.textContent = rowCount;
-    }
+    _updateKpi(mapping.kpiId, rowCount, mapping.kpiDir);
+    if (badge) badge.textContent = rowCount;
   }
 
   function setFilter(filterFn) {
@@ -306,28 +292,12 @@ const PanelManager = (() => {
    * Update a KPI card to show an event count.
    */
   function _updateKpi(kpiId, count, dir) {
-    let sub = `${count} event${count !== 1 ? 's' : ''} received`;
-    if (kpiId === 'kpi-file-changes') {
-      sub = `${count} resolved fix${count !== 1 ? 'es' : ''} total`;
-    }
+    const sub = `${count} event${count !== 1 ? 's' : ''} received`;
     setKpiState(
       kpiId,
       'data',
       String(count),
       sub,
-      dir ?? 'up',
-    );
-  }
-
-  /**
-   * Update a KPI card to show unique device names count.
-   */
-  function _updateKpiDevices(kpiId, count, dir) {
-    setKpiState(
-      kpiId,
-      'data',
-      String(count),
-      `${count} device${count !== 1 ? 's' : ''} detected`,
       dir ?? 'up',
     );
   }

@@ -390,21 +390,21 @@
             </div>
           </article>
 
-          <!-- KPI 3: Redmine Resolved Fixes -->
+          <!-- KPI 3: Critical File Changes (FIM) -->
           <article id="kpi-file-changes" class="kpi-card" data-state="loading"
-                   aria-label="Redmine resolved fixes KPI">
+                   aria-label="Critical file changes KPI">
             <div class="kpi-card-header">
-              <span class="kpi-card-label">Redmine Resolved Fixes</span>
-              <div class="kpi-icon kpi-icon--ok" aria-hidden="true">
-                <i data-lucide="file-check-2"></i>
+              <span class="kpi-card-label">Critical File Changes (FIM)</span>
+              <div class="kpi-icon kpi-icon--warn" aria-hidden="true">
+                <i data-lucide="file-warning"></i>
               </div>
             </div>
             <div class="kpi-skel-value skeleton"></div>
-            <div class="kpi-value" aria-label="Redmine resolved fixes count">—</div>
+            <div class="kpi-value" aria-label="Critical file changes count">—</div>
             <div class="kpi-skel-delta skeleton"></div>
             <div class="kpi-delta kpi-delta--flat">
               <i data-lucide="minus" aria-hidden="true"></i>
-              <span class="kpi-delta-text">awaiting Redmine data</span>
+              <span class="kpi-delta-text">awaiting Wazuh data</span>
             </div>
           </article>
 
@@ -580,16 +580,16 @@
             </div><!-- /panel-body -->
           </section><!-- /panel-critical-alerts -->
 
-          <!-- ── PANEL 2: Redmine Resolved Fixes ─ -->
+          <!-- ── PANEL 2: Critical File Changes (FIM) ─ -->
           <section id="panel-file-changes" class="panel"
-                   aria-label="Redmine resolved fixes and file patches panel">
+                   aria-label="Critical file changes and integrity monitoring panel">
             <header class="panel-header">
-              <div class="panel-header-icon panel-header-icon--ok" aria-hidden="true">
-                <i data-lucide="file-check-2"></i>
+              <div class="panel-header-icon panel-header-icon--warn" aria-hidden="true">
+                <i data-lucide="file-warning"></i>
               </div>
-              <h2 class="panel-title">Redmine Resolved Fixes</h2>
-              <span class="panel-count-badge" aria-label="Resolved fix count">0</span>
-              <button class="panel-refresh-btn" aria-label="Refresh Redmine resolved fixes">
+              <h2 class="panel-title">Critical File Changes (FIM)</h2>
+              <span class="panel-count-badge" aria-label="File change count">0</span>
+              <button class="panel-refresh-btn" aria-label="Refresh critical file changes">
                 <i data-lucide="refresh-cw"></i>
               </button>
             </header>
@@ -631,10 +631,10 @@
               <!-- Empty -->
               <div class="panel-state state-empty">
                 <div class="empty-icon empty-icon--ok">
-                  <i data-lucide="file-check-2"></i>
+                  <i data-lucide="file-check"></i>
                 </div>
-                <p class="empty-title">No resolved fixes recorded</p>
-                <p class="empty-sub">Issues and file patches resolved in Redmine will appear here.</p>
+                <p class="empty-title">Files intact</p>
+                <p class="empty-sub">Syscheck integrity monitoring is active — no unauthorized file modifications.</p>
               </div>
 
               <!-- Error -->
