@@ -2,6 +2,58 @@
   "critical_alerts": [],
   "blind_spots_agent_health": [
     {
+      "timestamp": "2026-08-26T04:39:09.746+0000",
+      "rule": {
+        "level": 7,
+        "description": "Listened ports status (netstat) changed (new port opened or closed).",
+        "id": "533",
+        "firedtimes": 1,
+        "mail": false,
+        "groups": [
+          "ossec"
+        ],
+        "pci_dss": [
+          "10.2.7",
+          "10.6.1"
+        ],
+        "gpg13": [
+          "10.1"
+        ],
+        "gdpr": [
+          "IV_35.7.d"
+        ],
+        "hipaa": [
+          "164.312.b"
+        ],
+        "nist_800_53": [
+          "AU.14",
+          "AU.6"
+        ],
+        "tsc": [
+          "CC6.8",
+          "CC7.2",
+          "CC7.3"
+        ]
+      },
+      "agent": {
+        "id": "000",
+        "name": "wazuh-server"
+      },
+      "manager": {
+        "name": "wazuh-server"
+      },
+      "id": "1787719149.4495344",
+      "previous_output": "Previous output:\nossec: output: 'netstat listening ports':\nudp        0      0 0.0.0.0:4789            0.0.0.0:*                           -                   \ntcp 0.0.0.0:22 0.0.0.0:* /usr\ntcp6 :::22 :::* /usr\nudp 127.0.0.1:323 0.0.0.0:* 3421/chronyd\nudp6 ::1:323 :::* 3421/chronyd\ntcp 0.0.0.0:443 0.0.0.0:* 2298678/node\nudp 0.0.0.0:514 0.0.0.0:* 3198298/wazuh-remot\ntcp 0.0.0.0:1514 0.0.0.0:* 3198296/wazuh-remot\ntcp 0.0.0.0:1515 0.0.0.0:* 3198144/wazuh-authd\ntcp6 :::2377 :::* 4161/dockerd\ntcp 0.0.0.0:3001 0.0.0.0:* 2911252/docker-prox\ntcp6 :::3001 :::* 2911258/docker-prox\ntcp6 :::7946 :::* 4161/dockerd\nudp6 :::7946 :::* 4161/dockerd\ntcp 0.0.0.0:8080 0.0.0.0:* 2840393/docker-prox\ntcp6 :::8080 :::* 2840400/docker-prox\ntcp6 127.0.0.1:9200 :::* 2299830/java\ntcp6 127.0.0.1:9300 :::* 2299830/java\ntcp 127.0.0.1:34865 0.0.0.0:* 4065/containerd\ntcp 0.0.0.0:55000 0.0.0.0:* 3198091/python3\ntcp6 :::55000 :::* 3198091/python3",
+      "full_log": "ossec: output: 'netstat listening ports':\nudp        0      0 0.0.0.0:4789            0.0.0.0:*                           -                   \ntcp 0.0.0.0:22 0.0.0.0:* /usr\ntcp6 :::22 :::* /usr\nudp 127.0.0.1:323 0.0.0.0:* 3421/chronyd\nudp6 ::1:323 :::* 3421/chronyd\ntcp 0.0.0.0:443 0.0.0.0:* 2298678/node\nudp 0.0.0.0:514 0.0.0.0:* 3198298/wazuh-remot\ntcp 0.0.0.0:1514 0.0.0.0:* 3198296/wazuh-remot\ntcp 0.0.0.0:1515 0.0.0.0:* 3198144/wazuh-authd\ntcp6 :::2377 :::* 4161/dockerd\ntcp 127.0.0.1:3000 0.0.0.0:* 3946626/sshd\ntcp6 ::1:3000 :::* 3946626/sshd\ntcp 0.0.0.0:3001 0.0.0.0:* 2911252/docker-prox\ntcp6 :::3001 :::* 2911258/docker-prox\ntcp6 :::7946 :::* 4161/dockerd\nudp6 :::7946 :::* 4161/dockerd\ntcp 0.0.0.0:8080 0.0.0.0:* 2840393/docker-prox\ntcp6 :::8080 :::* 2840400/docker-prox\ntcp6 127.0.0.1:9200 :::* 2299830/java\ntcp6 127.0.0.1:9300 :::* 2299830/java\ntcp 127.0.0.1:34865 0.0.0.0:* 4065/containerd\ntcp 0.0.0.0:55000 0.0.0.0:* 3198091/python3\ntcp6 :::55000 :::* 3198091/python3",
+      "decoder": {
+        "name": "ossec"
+      },
+      "previous_log": "ossec: output: 'netstat listening ports':\nudp        0      0 0.0.0.0:4789            0.0.0.0:*                           -                   \ntcp 0.0.0.0:22 0.0.0.0:* /usr\ntcp6 :::22 :::* /usr\nudp 127.0.0.1:323 0.0.0.0:* 3421/chronyd\nudp6 ::1:323 :::* 3421/chronyd\ntcp 0.0.0.0:443 0.0.0.0:* 2298678/node\nudp 0.0.0.0:514 0.0.0.0:* 3198298/wazuh-remot\ntcp 0.0.0.0:1514 0.0.0.0:* 3198296/wazuh-remot\ntcp 0.0.0.0:1515 0.0.0.0:* 3198144/wazuh-authd\ntcp6 :::2377 :::* 4161/dockerd\ntcp 0.0.0.0:3001 0.0.0.0:* 2911252/docker-prox\ntcp6 :::3001 :::* 2911258/docker-prox\ntcp6 :::7946 :::* 4161/dockerd\nudp6 :::7946 :::* 4161/dockerd\ntcp 0.0.0.0:8080 0.0.0.0:* 2840393/docker-prox\ntcp6 :::8080 :::* 2840400/docker-prox\ntcp6 127.0.0.1:9200 :::* 2299830/java\ntcp6 127.0.0.1:9300 :::* 2299830/java\ntcp 127.0.0.1:34865 0.0.0.0:* 4065/containerd\ntcp 0.0.0.0:55000 0.0.0.0:* 3198091/python3\ntcp6 :::55000 :::* 3198091/python3",
+      "location": "netstat listening ports",
+      "aegis_use_case": "blind_spots_agent_health",
+      "receivedAt": "2026-08-26T04:39:26.996986+00:00"
+    },
+    {
       "timestamp": "2026-08-25T10:02:50.170+0000",
       "rule": {
         "level": 7,
@@ -332,7 +384,16 @@
       },
       "location": "journald",
       "aegis_use_case": "auth_access_anomalies",
-      "receivedAt": "2026-08-25T09:12:19.905201+00:00"
+      "receivedAt": "2026-08-25T09:12:19.905201+00:00",
+      "redmine_ticket": {
+        "id": 36106,
+        "url": "http://10.145.10.62:3000/issues/36106",
+        "subject": "[Batch SOC] 1 Incidents (Max L10) on wazuh-server",
+        "status": "Open",
+        "batchCount": 1,
+        "dispatchedAt": "2026-08-26T04:40:08.771Z",
+        "dispatchedBy": "SOC Analyst"
+      }
     }
   ],
   "threat_intel_matches": []

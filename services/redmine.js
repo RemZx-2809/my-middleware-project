@@ -429,41 +429,6 @@ async function createBatchIssueFromAlerts(alerts = [], options = {}, config = {}
   }
 }
 
-    const issue = res.data?.issue;
-    const issueId = issue?.id;
-    const issueUrl = `${baseUrl.replace(/\/+$/, '')}/issues/${issueId}`;
-
-    // Record in deduplication cache
-    _dedupCache.set(fingerprint, {
-      timestamp: Date.now(),
-      issueId,
-      count: 1,
-      lastSubject: subject,
-    });
-
-    // Log to Audit Log for History tracking
-    await logAudit({
-      user: 'aegis-auto-ticketer',
-      action: 'redmine_issue_created',
-      filename: `Redmine Issue #${issueId}`,
-      before: `Alert L${level} (${ruleId || desc}): Device ${targetDevice}`,
-      after: `Created Issue #${issueId}: ${subject}\nURL: ${issueUrl}`,
-    }).catch(() => {});
-
-    console.log(`[Redmine] Auto-created Issue #${issueId} for ${targetDevice} (${subject})`);
-
-    return {
-      ok: true,
-      issueId,
-      issueUrl,
-      subject,
-    };
-  } catch (err) {
-    console.error('[Redmine] Failed to create issue:', err.message);
-    return { ok: false, error: err.message };
-  }
-}
-
 /**
  * 3. Sync Recent Resolved/Closed Issues from Redmine into Audit Log
  */
