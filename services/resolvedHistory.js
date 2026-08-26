@@ -148,14 +148,23 @@ async function getResolvedHistory({ search = '', limit = 500 } = {}) {
 async function deleteResolvedRecord(id) {
   _loadStore();
   _loadTombstones();
-  const target = _resolvedStore.find(r => r.id === id || String(r.issueId) === String(id));
+  const idStr = String(id);
+  _tombstones.add(idStr);
+  const numMatch = idStr.match(/\d+/);
+  if (numMatch) {
+    _tombstones.add(numMatch[0]);
+    _tombstones.add(`res-redmine-${numMatch[0]}`);
+  }
+
+  const target = _resolvedStore.find(r => r.id === id || String(r.issueId) === idStr);
   if (target) {
     if (target.id) _tombstones.add(String(target.id));
     if (target.issueId) _tombstones.add(String(target.issueId));
-    _saveTombstones();
   }
+  _saveTombstones();
+
   const beforeLen = _resolvedStore.length;
-  _resolvedStore = _resolvedStore.filter(r => r.id !== id && String(r.issueId) !== String(id));
+  _resolvedStore = _resolvedStore.filter(r => r.id !== id && String(r.issueId) !== idStr);
   if (_resolvedStore.length !== beforeLen) {
     _saveStore();
     return true;
@@ -170,6 +179,15 @@ async function deleteMultipleResolvedRecords(ids = []) {
   _loadStore();
   _loadTombstones();
   const idSet = new Set(ids.map(String));
+  for (const id of ids) {
+    const idStr = String(id);
+    _tombstones.add(idStr);
+    const numMatch = idStr.match(/\d+/);
+    if (numMatch) {
+      _tombstones.add(numMatch[0]);
+      _tombstones.add(`res-redmine-${numMatch[0]}`);
+    }
+  }
   for (const r of _resolvedStore) {
     if (idSet.has(String(r.id)) || (r.issueId && idSet.has(String(r.issueId)))) {
       if (r.id) _tombstones.add(String(r.id));
