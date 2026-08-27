@@ -44,13 +44,17 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000).unref();
 
-const ADMIN_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+const ADMIN_IPS = new Set(
+  process.env.AEGIS_ADMIN_ALLOW_IPS
+    ? process.env.AEGIS_ADMIN_ALLOW_IPS.split(',').map(s => s.trim()).filter(Boolean)
+    : []
+);
 function getRemoteIp(req) {
   return (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
 }
 function isAdminIpAllowed(ip) {
-  if (ADMIN_IPS.size === 0) return true;
-  return ADMIN_IPS.has(ip);
+  if (ADMIN_IPS.size === 0) return true; // Open in dev/internal LAN testing unless AEGIS_ADMIN_ALLOW_IPS is explicitly set
+  return ADMIN_IPS.has(ip) || ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
 }
 function denyAdminIp(res, ip) {
   console.warn(`[AEGIS] Admin action blocked for IP: ${ip}`);
