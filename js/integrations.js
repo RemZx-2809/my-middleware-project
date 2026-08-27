@@ -92,9 +92,9 @@ const IntegrationsController = (() => {
       const data = await res.json();
 
       if (_secretInput) _secretInput.value = data.webhookSecret || '';
-      if (_sshHostInput) _sshHostInput.value = data.sshHost || '10.145.10.57';
-      if (_sshUserInput) _sshUserInput.value = data.sshUser || 'tawaikiar_p';
-      if (_sshAutoTunnelCheckbox) _sshAutoTunnelCheckbox.checked = data.sshAutoTunnel !== false;
+      if (_sshHostInput) _sshHostInput.value = data.sshHost || '';
+      if (_sshUserInput) _sshUserInput.value = data.sshUser || '';
+      if (_sshAutoTunnelCheckbox) _sshAutoTunnelCheckbox.checked = !!data.sshAutoTunnel;
     } catch (e) {
       console.warn('[IntegrationsController] Could not load config:', e.message);
     }
@@ -110,9 +110,9 @@ const IntegrationsController = (() => {
 
     const payload = {
       webhookSecret: _secretInput?.value.trim() || '',
-      sshHost:       _sshHostInput?.value.trim() || '10.145.10.57',
-      sshUser:       _sshUserInput?.value.trim() || 'tawaikiar_p',
-      sshAutoTunnel: _sshAutoTunnelCheckbox?.checked ?? true,
+      sshHost:       _sshHostInput?.value.trim() || '',
+      sshUser:       _sshUserInput?.value.trim() || '',
+      sshAutoTunnel: _sshAutoTunnelCheckbox?.checked ?? false,
     };
 
     try {

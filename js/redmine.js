@@ -62,6 +62,9 @@ const RedmineController = (() => {
       if (_dedupHoursSelect)   _dedupHoursSelect.value = cfg.redmineDedupHours || '24';
       if (_autoTicketCheckbox) _autoTicketCheckbox.checked = cfg.redmineAutoTicket !== false;
 
+      const targetProjEl = document.getElementById('rd-modal-target-project');
+      if (targetProjEl) targetProjEl.value = cfg.redmineProject || '';
+
       _updateTriggerModeUI(cfg.redmineTriggerMode || 'min_level');
 
       // Check topbar status
@@ -440,6 +443,9 @@ const RedmineDispatchController = (() => {
     if (prioritySelect) prioritySelect.value = defaultPriority;
     if (notesInput) notesInput.value = '';
 
+    const targetProjEl = document.getElementById('rd-modal-target-project');
+    if (targetProjEl) targetProjEl.value = _config?.redmineProject || '';
+
     modal.style.display = 'flex';
     if (typeof lucide !== 'undefined') lucide.createIcons();
     setTimeout(() => subjectInput?.focus(), 50);
@@ -502,7 +508,7 @@ const RedmineDispatchController = (() => {
       }
 
       const issueId = data.issueId;
-      const issueUrl = data.issueUrl || `http://10.145.10.62:3000/issues/${issueId}`;
+      const issueUrl = data.issueUrl || (_config?.redmineUrl ? `${_config.redmineUrl.replace(/\/+$/, '')}/issues/${issueId}` : '#');
 
       if (window.Toast) {
         window.Toast.show({

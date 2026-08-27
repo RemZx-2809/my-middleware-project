@@ -1211,8 +1211,8 @@
                       type="text"
                       id="ssh-host"
                       class="int-input"
-                      placeholder="e.g. 10.145.10.57"
-                      value="10.145.10.57"
+                      placeholder="e.g. 192.168.1.100"
+                      value=""
                       autocomplete="off"
                     />
                   </div>
@@ -1230,8 +1230,8 @@
                       type="text"
                       id="ssh-user"
                       class="int-input"
-                      placeholder="e.g. tawaikiar_p"
-                      value="tawaikiar_p"
+                      placeholder="e.g. soc-user"
+                      value=""
                       autocomplete="off"
                     />
                   </div>
@@ -1243,7 +1243,7 @@
                     <label class="int-label" style="margin-bottom:0;" for="ssh-auto-tunnel">
                       <span>Auto-Connect Tunnel on Startup</span>
                     </label>
-                    <input type="checkbox" id="ssh-auto-tunnel" checked style="width: 18px; height: 18px; cursor: pointer; accent-color: #34d399;" />
+                    <input type="checkbox" id="ssh-auto-tunnel" style="width: 18px; height: 18px; cursor: pointer; accent-color: #34d399;" />
                   </div>
                   <span class="int-field-hint">Automatically creates reverse tunnel (<code style="color:#34d399;">-R 3000:localhost:3000</code>) using RSA key.</span>
                 </div>
@@ -2129,7 +2129,7 @@
           </label>
           <div class="int-input-wrap">
             <span class="int-input-icon"><i data-lucide="folder-git-2"></i></span>
-            <input type="text" id="rd-modal-target-project" class="int-input" readonly value="tawaikiar-phoowang" style="color:var(--text-lo); background:rgba(255,255,255,0.02);" />
+            <input type="text" id="rd-modal-target-project" class="int-input" readonly placeholder="Configured in Settings" value="" style="color:var(--text-lo); background:rgba(255,255,255,0.02);" />
           </div>
         </div>
       </div>

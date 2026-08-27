@@ -72,8 +72,11 @@ let _config = {
   redmineMinLevel: '7',
   redmineCustomRules: '',          // comma-separated Rule IDs (e.g. 81628, 5710, 550)
   redmineDedupHours: '24',         // deduplication window in hours (0 = disable)
-  redmineAutoTicket: true,
+  redmineAutoTicket: false,
   ingestSince: 'auto',             // 'auto' = automatically starts from the moment middleware starts running
+  sshAutoTunnel: false,
+  sshHost: '',
+  sshUser: '',
 };
 /* ════════════════════════════════════════════════════════════
    SSH REVERSE TUNNEL MANAGER
@@ -891,9 +894,9 @@ const server = http.createServer(async (req, res) => {
       webhookSecret: _config.webhookSecret || '',
       webhookSecretSet: !!_config.webhookSecret,
       devMode: !_config.webhookSecret,
-      sshHost: _config.sshHost || '10.145.10.57',
-      sshUser: _config.sshUser || 'tawaikiar_p',
-      sshAutoTunnel: _config.sshAutoTunnel !== false,
+      sshHost: _config.sshHost || '',
+      sshUser: _config.sshUser || '',
+      sshAutoTunnel: !!_config.sshAutoTunnel,
       ingestSince: _config.ingestSince || 'auto',
       effectiveIngestSince: getEffectiveIngestCutoff(),
       serviceBootTime: _serviceBootTime,

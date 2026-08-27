@@ -1,0 +1,17 @@
+{
+  "webhookSecret": "",
+  "caPath": "",
+  "redmineUrl": "",
+  "redmineApiKey": "",
+  "redmineProject": "",
+  "redmineTrackerId": "1",
+  "redmineTriggerMode": "min_level",
+  "redmineMinLevel": "7",
+  "redmineCustomRules": "",
+  "redmineDedupHours": "24",
+  "redmineAutoTicket": false,
+  "ingestSince": "auto",
+  "sshAutoTunnel": false,
+  "sshHost": "",
+  "sshUser": ""
+}

@@ -82,6 +82,11 @@ const TerminalController = (() => {
     });
   }
 
+  function _getUserPrompt() {
+    const user = document.getElementById('ssh-user')?.value.trim() || 'user';
+    return `${user}@wazuh:~$`;
+  }
+
   function toggleRootMode() {
     _setRootMode(!_isRootMode);
   }
@@ -89,7 +94,7 @@ const TerminalController = (() => {
   function _setRootMode(enabled) {
     _isRootMode = enabled;
     if (_promptEl) {
-      _promptEl.textContent = _isRootMode ? 'root@wazuh:~#' : 'tawaikiar_p@wazuh:~$';
+      _promptEl.textContent = _isRootMode ? 'root@wazuh:~#' : _getUserPrompt();
       _promptEl.style.color = _isRootMode ? '#ff5f56' : '#38ef7d';
     }
     if (_rootToggle) {
@@ -106,6 +111,7 @@ const TerminalController = (() => {
   function onViewOpen() {
     setTimeout(() => {
       if (_inputEl) _inputEl.focus();
+      if (_promptEl && !_isRootMode) _promptEl.textContent = _getUserPrompt();
       if (typeof lucide !== 'undefined') lucide.createIcons();
     }, 100);
   }
@@ -122,7 +128,7 @@ const TerminalController = (() => {
       _appendLine(`
         <div class="term-entry">
           <div class="term-entry-header">
-            <span class="term-prompt">tawaikiar_p@wazuh:~$</span>
+            <span class="term-prompt">${_getUserPrompt()}</span>
             <span class="term-cmd-text">${_escapeHtml(cmd)}</span>
             <span class="term-time">${new Date().toLocaleTimeString()}</span>
           </div>
@@ -149,7 +155,7 @@ const TerminalController = (() => {
             <span class="term-time">${new Date().toLocaleTimeString()}</span>
           </div>
           <div class="term-output term-output--ok">
-            ⬅️ Logged out of root. Switched back to <strong>tawaikiar_p@wazuh:~$</strong>
+            ⬅️ Logged out of root. Switched back to <strong>${_getUserPrompt()}</strong>
           </div>
         </div>
       `);
@@ -172,7 +178,7 @@ const TerminalController = (() => {
 
     // Render command line in terminal
     const timeStr = new Date().toLocaleTimeString();
-    const promptText = _isRootMode ? 'root@wazuh:~#' : 'tawaikiar_p@wazuh:~$';
+    const promptText = _isRootMode ? 'root@wazuh:~#' : _getUserPrompt();
     const promptColor = _isRootMode ? '#ff5f56' : '#38ef7d';
 
     _appendLine(`
@@ -236,6 +242,7 @@ const TerminalController = (() => {
   }
 
   function _showSudoPrompt(entryEl, originalCmd) {
+    const user = document.getElementById('ssh-user')?.value.trim() || 'user';
     const promptDiv = document.createElement('div');
     promptDiv.className = 'term-sudo-box';
     promptDiv.innerHTML = `
@@ -244,7 +251,7 @@ const TerminalController = (() => {
         <span><strong>Sudo requires authorization.</strong> Enter your Wazuh Server password below to unlock permanently:</span>
       </div>
       <div style="display:flex; gap:8px; align-items:center;">
-        <input type="password" class="term-sudo-input" placeholder="Enter password (tawaikiar_p)..." autocomplete="off" />
+        <input type="password" class="term-sudo-input" placeholder="Enter password (${_escapeHtml(user)})..." autocomplete="off" />
         <button type="button" class="int-btn int-btn--primary term-sudo-btn" style="padding:4px 14px; font-size:12px;">
           <i data-lucide="unlock"></i> Unlock & Execute
         </button>

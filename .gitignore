@@ -1,12 +1,22 @@
+# Environment & Credentials
 .env
+.env.local
+.env.*.local
+.aegis-ssh/
+aegis.config.json
+
+# Dependencies
 node_modules/
+
+# Logs & Diagnostics
 *.log
 *.err
 *.tmp
+server_tail.txt
 
 # Runtime Data Stores & Databases (Do NOT commit runtime dynamic data)
 resolved_history.json
 resolved_tombstones.json
 aegis.store.json
 aegis.store.json.tmp
-audit.log.ndjson
+audit.log.ndjson
