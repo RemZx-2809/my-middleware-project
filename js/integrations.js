@@ -1,45 +1,70 @@
 /**
- * Aegis SOC — Pure Receiver & SSH Tunnel Settings Controller
+ * Aegis SOC — Pure Receiver & Webhook Ingestion Controller
  *
  * Manages:
- *  1. Webhook Ingest URL copy helper & Shared Secret settings
- *  2. SSH Reverse Tunnel Host, User, and Auto-Start configuration
- *  3. Live SSH Tunnel state monitoring & Connect/Disconnect toggle
- *  4. Syncs settings directly with /api/config on the Node.js backend
+ *  1. Dynamic Webhook Ingest URL generator & 1-click clipboard copy
+ *  2. Real-time Wazuh ossec.conf XML integration snippet generator
+ *  3. Webhook Shared Secret authentication configuration
+ *  4. Syncs settings directly with /api/config on Node.js backend
  */
 
 'use strict';
 
 const IntegrationsController = (() => {
-  let _secretInput = null;
-  let _sshHostInput = null;
-  let _sshUserInput = null;
-  let _sshAutoTunnelCheckbox = null;
-  let _saveBtn = null;
-  let _copyWebhookBtn = null;
-  let _secretRevealBtn = null;
-  let _tunnelToggleBtn = null;
-  let _tunnelStatusText = null;
+  let _secretInput      = null;
+  let _saveBtn          = null;
+  let _copyWebhookBtn   = null;
+  let _copyOssecXmlBtn  = null;
+  let _secretRevealBtn  = null;
+  let _urlInput         = null;
+  let _ossecXmlSnippet  = null;
 
-  let _tunnelStatusInterval = null;
+  function _getWebhookUrl() {
+    return `${window.location.protocol}//${window.location.host}/api/wazuh-webhook`;
+  }
+
+  function _updateXmlSnippet() {
+    if (!_ossecXmlSnippet) return;
+    const url = _urlInput?.value || _getWebhookUrl();
+    const secret = _secretInput?.value?.trim() || '';
+    const apiKeyBlock = secret ? `\n    <api_key>${_escapeXml(secret)}</api_key>` : '';
+
+    const xml = `<ossec_config>
+  <integration>
+    <name>custom-aegis</name>
+    <hook_url>${url}</hook_url>${apiKeyBlock}
+    <alert_format>json</alert_format>
+    <alert_level>3</alert_level>
+  </integration>
+</ossec_config>`;
+
+    _ossecXmlSnippet.textContent = xml;
+  }
+
+  function _escapeXml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
 
   /* ── Init ────────────────────────────────────────────────── */
   function init() {
-    _secretInput           = document.getElementById('wazuh-webhook-secret');
-    _sshHostInput          = document.getElementById('ssh-host');
-    _sshUserInput          = document.getElementById('ssh-user');
-    _sshAutoTunnelCheckbox = document.getElementById('ssh-auto-tunnel');
-    _saveBtn               = document.getElementById('wazuh-save-btn');
-    _copyWebhookBtn        = document.getElementById('btn-copy-webhook-url');
-    _secretRevealBtn       = document.getElementById('wazuh-secret-reveal-btn');
-    _tunnelToggleBtn       = document.getElementById('btn-toggle-tunnel');
-    _tunnelStatusText      = document.getElementById('settings-tunnel-status-text');
+    _secretInput     = document.getElementById('wazuh-webhook-secret');
+    _saveBtn         = document.getElementById('wazuh-save-btn');
+    _copyWebhookBtn  = document.getElementById('btn-copy-webhook-url');
+    _copyOssecXmlBtn = document.getElementById('btn-copy-ossec-xml');
+    _secretRevealBtn = document.getElementById('wazuh-secret-reveal-btn');
+    _urlInput        = document.getElementById('wazuh-webhook-url');
+    _ossecXmlSnippet = document.getElementById('ossec-xml-snippet');
+
+    // Auto-detect and populate dynamic current URL
+    if (_urlInput) {
+      _urlInput.value = _getWebhookUrl();
+    }
+    _updateXmlSnippet();
 
     // 1. Copy Webhook URL
     if (_copyWebhookBtn) {
       _copyWebhookBtn.addEventListener('click', () => {
-        const urlInput = document.getElementById('wazuh-webhook-url');
-        const text = urlInput?.value || 'http://127.0.0.1:3000/api/wazuh-webhook';
+        const text = _urlInput?.value || _getWebhookUrl();
         navigator.clipboard.writeText(text).then(() => {
           if (window.Toast) {
             window.Toast.show({
@@ -53,7 +78,24 @@ const IntegrationsController = (() => {
       });
     }
 
-    // 2. Secret reveal button
+    // 2. Copy ossec.conf XML snippet
+    if (_copyOssecXmlBtn) {
+      _copyOssecXmlBtn.addEventListener('click', () => {
+        const text = _ossecXmlSnippet?.textContent || '';
+        navigator.clipboard.writeText(text).then(() => {
+          if (window.Toast) {
+            window.Toast.show({
+              type: 'success',
+              title: 'ossec.conf XML Copied',
+              body: 'Paste this snippet into /var/ossec/etc/ossec.conf on Wazuh Manager',
+              duration: 3500,
+            });
+          }
+        });
+      });
+    }
+
+    // 3. Secret reveal button & dynamic XML update
     if (_secretRevealBtn && _secretInput) {
       _secretRevealBtn.addEventListener('click', () => {
         const isPwd = _secretInput.type === 'password';
@@ -61,27 +103,19 @@ const IntegrationsController = (() => {
         _secretRevealBtn.innerHTML = `<i data-lucide="${isPwd ? 'eye-off' : 'eye'}"></i>`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
       });
+      _secretInput.addEventListener('input', _updateXmlSnippet);
     }
 
-    // 3. Save Settings
+    // 4. Save Settings
     if (_saveBtn) {
       _saveBtn.addEventListener('click', saveSettings);
     }
 
-    // 4. Toggle SSH Tunnel
-    if (_tunnelToggleBtn) {
-      _tunnelToggleBtn.addEventListener('click', toggleTunnel);
-    }
-
     // Load initial settings
     loadSettings();
-    pollTunnelStatus();
-
-    if (_tunnelStatusInterval) clearInterval(_tunnelStatusInterval);
-    _tunnelStatusInterval = setInterval(pollTunnelStatus, 6000);
 
     if (typeof lucide !== 'undefined') lucide.createIcons();
-    console.log('[IntegrationsController] Initialized Pure Receiver & SSH Tunnel settings.');
+    console.log('[IntegrationsController] Initialized Pure Webhook URL Ingestion.');
   }
 
   /* ── Load Settings from Backend ──────────────────────────── */
@@ -92,9 +126,15 @@ const IntegrationsController = (() => {
       const data = await res.json();
 
       if (_secretInput) _secretInput.value = data.webhookSecret || '';
-      if (_sshHostInput) _sshHostInput.value = data.sshHost || '';
-      if (_sshUserInput) _sshUserInput.value = data.sshUser || '';
-      if (_sshAutoTunnelCheckbox) _sshAutoTunnelCheckbox.checked = !!data.sshAutoTunnel;
+
+      // If user opened on localhost, automatically prefer real LAN IP so Wazuh can connect
+      if (data.serverIp && data.serverIp !== '127.0.0.1') {
+        const port = data.port || window.location.port || '3000';
+        const lanUrl = `http://${data.serverIp}:${port}/api/wazuh-webhook`;
+        if (_urlInput) _urlInput.value = lanUrl;
+      }
+
+      _updateXmlSnippet();
     } catch (e) {
       console.warn('[IntegrationsController] Could not load config:', e.message);
     }
@@ -110,9 +150,6 @@ const IntegrationsController = (() => {
 
     const payload = {
       webhookSecret: _secretInput?.value.trim() || '',
-      sshHost:       _sshHostInput?.value.trim() || '',
-      sshUser:       _sshUserInput?.value.trim() || '',
-      sshAutoTunnel: _sshAutoTunnelCheckbox?.checked ?? false,
     };
 
     try {
@@ -128,10 +165,11 @@ const IntegrationsController = (() => {
           window.Toast.show({
             type: 'success',
             title: 'Settings Saved',
-            body: 'Ingestion & SSH Tunnel configuration saved successfully',
+            body: 'Webhook Ingestion configuration updated successfully',
             duration: 2500,
           });
         }
+        _updateXmlSnippet();
       } else {
         if (window.Toast) {
           window.Toast.show({
@@ -154,67 +192,9 @@ const IntegrationsController = (() => {
     } finally {
       if (_saveBtn) {
         _saveBtn.disabled = false;
-        _saveBtn.innerHTML = '<i data-lucide="save"></i> Save Ingestion &amp; Tunnel Settings';
+        _saveBtn.innerHTML = '<i data-lucide="save"></i> Save Ingestion Settings';
         if (typeof lucide !== 'undefined') lucide.createIcons();
       }
-    }
-  }
-
-  /* ── Poll Live SSH Tunnel Status ─────────────────────────── */
-  async function pollTunnelStatus() {
-    if (!_tunnelStatusText) return;
-    try {
-      const res = await fetch('/api/tunnel');
-      if (!res.ok) return;
-      const data = await res.json();
-
-      const isOpen = data.active && data.state === 'connected';
-      const isConnecting = data.state === 'connecting';
-
-      if (isOpen) {
-        _tunnelStatusText.innerHTML = `<span style="color:#34d399; font-weight:600;">● Active &amp; Forwarding</span> (Remote port ${data.remotePort || 3000} → Local 3000)`;
-        if (_tunnelToggleBtn) {
-          _tunnelToggleBtn.className = 'int-btn int-btn--outline-danger';
-          _tunnelToggleBtn.innerHTML = '<i data-lucide="power-off"></i> Disconnect';
-        }
-      } else if (isConnecting) {
-        _tunnelStatusText.innerHTML = `<span style="color:#fbbf24; font-weight:600;">◌ Connecting…</span> to ${data.host || 'remote host'}`;
-        if (_tunnelToggleBtn) {
-          _tunnelToggleBtn.className = 'int-btn int-btn--neutral';
-          _tunnelToggleBtn.innerHTML = '<i data-lucide="loader-2" class="spinning"></i> Connecting…';
-        }
-      } else {
-        _tunnelStatusText.innerHTML = `<span style="color:#94a3b8;">○ Disconnected</span> ${data.error ? `<span style="color:#f4576a;">(${data.error})</span>` : ''}`;
-        if (_tunnelToggleBtn) {
-          _tunnelToggleBtn.className = 'int-btn int-btn--primary';
-          _tunnelToggleBtn.innerHTML = '<i data-lucide="plug"></i> Connect Tunnel';
-        }
-      }
-      if (typeof lucide !== 'undefined') lucide.createIcons();
-    } catch (_) {}
-  }
-
-  /* ── Toggle SSH Tunnel ───────────────────────────────────── */
-  async function toggleTunnel() {
-    if (!_tunnelToggleBtn) return;
-    _tunnelToggleBtn.disabled = true;
-    try {
-      const checkRes = await fetch('/api/tunnel');
-      const checkData = await checkRes.json();
-      const isOpen = checkData.active && checkData.state === 'connected';
-
-      if (isOpen) {
-        await fetch('/api/tunnel', { method: 'DELETE' });
-        if (window.Toast) window.Toast.show({ type: 'info', title: 'Tunnel Stopped', body: 'SSH reverse tunnel disconnected', duration: 2000 });
-      } else {
-        await fetch('/api/tunnel', { method: 'POST' });
-        if (window.Toast) window.Toast.show({ type: 'info', title: 'Tunnel Starting', body: 'Connecting SSH reverse tunnel…', duration: 2500 });
-      }
-      setTimeout(pollTunnelStatus, 800);
-    } catch (e) {
-      if (window.Toast) window.Toast.show({ type: 'error', title: 'Tunnel Error', body: e.message, duration: 3000 });
-    } finally {
-      _tunnelToggleBtn.disabled = false;
     }
   }
 
@@ -222,9 +202,8 @@ const IntegrationsController = (() => {
     init,
     loadSettings,
     saveSettings,
-    toggleTunnel,
-    pollTunnelStatus,
   };
 })();
 
 window.IntegrationsController = IntegrationsController;
+

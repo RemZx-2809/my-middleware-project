@@ -92,71 +92,37 @@ const TopbarController = (() => {
 
     setConnectionState(initialConnected ? 'connected' : 'not-connected');
 
-    // SSH Tunnel button wiring
-    _initTunnelBtn();
-
+    // Webhook Ingest URL copy button wiring
+    _initWebhookCopyBtn();
 
     if (typeof lucide !== 'undefined') {
       lucide.createIcons();
     }
   }
 
-  /* ── SSH Tunnel Button ───────────────────────────────────── */
-  function _initTunnelBtn() {
-    const btn = document.getElementById('tunnel-btn');
+  /* ── Webhook Ingest URL Copy Button ──────────────────────── */
+  function _initWebhookCopyBtn() {
+    const btn = document.getElementById('webhook-copy-btn');
     if (!btn) return;
 
-    // Poll tunnel status on load and every 5s
-    _refreshTunnelStatus(btn);
-    setInterval(() => _refreshTunnelStatus(btn), 5000);
-
-    btn.addEventListener('click', async () => {
-      const state = btn.dataset.state;
-      if (state === 'connecting') return; // ignore while busy
-
-      btn.dataset.state = 'connecting';
-      btn.querySelector('.tunnel-btn-text').textContent = 'Connecting…';
-
-      try {
-        if (state === 'open') {
-          // Stop tunnel
-          await fetch('/api/tunnel', { method: 'DELETE' });
-          _setTunnelState(btn, false);
-          Toast.show({ type: 'warn', title: 'Tunnel Closed', body: 'SSH Reverse Tunnel has been disconnected.', duration: 3500 });
-        } else {
-          // Start tunnel
-          await fetch('/api/tunnel', { method: 'POST' });
-          // Give SSH a moment to connect
-          await new Promise(r => setTimeout(r, 2000));
-          await _refreshTunnelStatus(btn);
-          if (btn.dataset.state === 'open') {
-            Toast.show({ type: 'ok', title: 'Tunnel Open', body: 'SSH Reverse Tunnel is active. Wazuh can now send alerts to the middleware.', duration: 4000 });
-          }
-        }
-      } catch (e) {
-        btn.dataset.state = 'closed';
-        btn.querySelector('.tunnel-btn-text').textContent = 'Open Tunnel';
-        Toast.show({ type: 'error', title: 'Tunnel Error', body: 'Could not reach the server. Is node server.js running?', duration: 4000 });
-      }
+    btn.addEventListener('click', () => {
+      const webhookUrl = `${window.location.protocol}//${window.location.host}/api/wazuh-webhook`;
+      navigator.clipboard.writeText(webhookUrl).then(() => {
+        Toast.show({
+          type: 'ok',
+          title: '🔗 Webhook URL Copied!',
+          body: `Copied: ${webhookUrl} (Paste into Wazuh ossec.conf)`,
+          duration: 3500,
+        });
+      }).catch(() => {
+        Toast.show({
+          type: 'info',
+          title: 'Webhook Receiver Endpoint',
+          body: webhookUrl,
+          duration: 4000,
+        });
+      });
     });
-  }
-
-  async function _refreshTunnelStatus(btn) {
-    if (!btn) { btn = document.getElementById('tunnel-btn'); }
-    if (!btn) return;
-    try {
-      const res  = await fetch('/api/tunnel');
-      const data = await res.json();
-      _setTunnelState(btn, data.running);
-    } catch (_) {
-      _setTunnelState(btn, false);
-    }
-  }
-
-  function _setTunnelState(btn, running) {
-    btn.dataset.state = running ? 'open' : 'closed';
-    const textEl = btn.querySelector('.tunnel-btn-text');
-    if (textEl) textEl.textContent = running ? 'Tunnel Open' : 'Open Tunnel';
   }
 
 

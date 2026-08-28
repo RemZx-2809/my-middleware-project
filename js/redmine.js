@@ -444,7 +444,8 @@ const RedmineDispatchController = (() => {
     if (notesInput) notesInput.value = '';
 
     const targetProjEl = document.getElementById('rd-modal-target-project');
-    if (targetProjEl) targetProjEl.value = _config?.redmineProject || '';
+    const projectInput = document.getElementById('redmine-project');
+    if (targetProjEl) targetProjEl.value = (projectInput && projectInput.value) || targetProjEl.value || '';
 
     modal.style.display = 'flex';
     if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -508,7 +509,9 @@ const RedmineDispatchController = (() => {
       }
 
       const issueId = data.issueId;
-      const issueUrl = data.issueUrl || (_config?.redmineUrl ? `${_config.redmineUrl.replace(/\/+$/, '')}/issues/${issueId}` : '#');
+      const redmineUrlInput = document.getElementById('redmine-url');
+      const baseUrl = (redmineUrlInput && redmineUrlInput.value) ? redmineUrlInput.value.trim() : '';
+      const issueUrl = data.issueUrl || (baseUrl ? `${baseUrl.replace(/\/+$/, '')}/issues/${issueId}` : '#');
 
       if (window.Toast) {
         window.Toast.show({

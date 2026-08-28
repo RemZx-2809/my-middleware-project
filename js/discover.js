@@ -637,7 +637,7 @@ const DiscoverController = (() => {
 
     // Render Table Headers dynamically according to _visibleColumns
     if (thead) {
-      const allChecked = pageLogs.length > 0 && pageLogs.every(l => _selectedLogIds.has(String(l.id || l._id || l.timestamp)));
+      const allChecked = pageLogs.length > 0 && pageLogs.every((l, idx) => _selectedLogIds.has(_getAlertId(l, startIdx + idx)));
       thead.innerHTML = `
         <tr>
           <th style="width: 36px; text-align: center;">
@@ -676,7 +676,7 @@ const DiscoverController = (() => {
     pageLogs.forEach((log, idx) => {
       const globalIdx = startIdx + idx;
       const isExpanded = _expandedRowId === globalIdx;
-      const logId = String(log.id || log._id || log.timestamp || globalIdx);
+      const logId = _getAlertId(log, globalIdx);
       const isSelected = _selectedLogIds.has(logId);
 
       let cellsHtml = '';
@@ -2809,6 +2809,11 @@ const DiscoverController = (() => {
     }
   }
 
+  function _getAlertId(log, fallbackIdx) {
+    if (!log) return String(fallbackIdx ?? '');
+    return String(log.id || log._id || log.timestamp || log.receivedAt || fallbackIdx);
+  }
+
   function toggleSelectAll(checked) {
     const logs = getSortedLogs(getFilteredLogs());
     const { currentPage, rowsPerPage } = _pagination;
@@ -2816,7 +2821,7 @@ const DiscoverController = (() => {
     const pageLogs = logs.slice(startIdx, startIdx + rowsPerPage);
 
     pageLogs.forEach((l, idx) => {
-      const id = String(l.id || l._id || l.timestamp || (startIdx + idx));
+      const id = _getAlertId(l, startIdx + idx);
       if (checked) _selectedLogIds.add(id);
       else _selectedLogIds.delete(id);
     });
@@ -2858,20 +2863,20 @@ const DiscoverController = (() => {
   }
 
   function openBatchRedmineModal() {
-    const all = getFilteredLogs();
-    const selectedAlerts = all.filter((l, idx) => _selectedLogIds.has(String(l.id || l._id || l.timestamp || idx)));
+    const all = getSortedLogs(getFilteredLogs());
+    const selectedAlerts = all.filter((l, idx) => _selectedLogIds.has(_getAlertId(l, idx)));
     if (selectedAlerts.length === 0) {
       if (window.Toast) window.Toast.show({ type: 'warn', title: 'No Alerts Selected', body: 'Please select at least 1 alert to dispatch', duration: 2000 });
       return;
     }
-    if (window.RedmineDispatchController) {
+    if (window.RedmineDispatchController && typeof window.RedmineDispatchController.openBatchModal === 'function') {
       window.RedmineDispatchController.openBatchModal(selectedAlerts);
     }
   }
 
   function getLogById(id) {
-    const all = getFilteredLogs();
-    return all.find((l, idx) => String(l.id || l._id || l.timestamp || idx) === String(id)) || null;
+    const all = getSortedLogs(getFilteredLogs());
+    return all.find((l, idx) => _getAlertId(l, idx) === String(id)) || null;
   }
 
   function getLogByGlobalIdx(idx) {

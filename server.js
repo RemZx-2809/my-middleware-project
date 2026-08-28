@@ -10,7 +10,21 @@ const http         = require('http');
 const https        = require('https');
 const fs           = require('fs');
 const path         = require('path');
+const os           = require('os');
 const { spawn }    = require('child_process');
+
+function getServerIps() {
+  const interfaces = os.networkInterfaces();
+  const ips = [];
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name] || []) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        ips.push(iface.address);
+      }
+    }
+  }
+  return ips;
+}
 
 const PORT        = parseInt(process.env.PORT || '3000', 10);
 const STATIC_ROOT = path.resolve(__dirname);
@@ -894,10 +908,14 @@ const server = http.createServer(async (req, res) => {
      GET /api/config
   ══════════════════════════════════════════════════════════ */
   if (pathname === '/api/config' && method === 'GET') {
+    const detectedIps = getServerIps();
     return json(res, 200, {
       webhookSecret: _config.webhookSecret || '',
       webhookSecretSet: !!_config.webhookSecret,
       devMode: !_config.webhookSecret,
+      serverIp: detectedIps[0] || '127.0.0.1',
+      serverIps: detectedIps,
+      port: PORT,
       sshHost: _config.sshHost || '',
       sshUser: _config.sshUser || '',
       sshAutoTunnel: !!_config.sshAutoTunnel,
